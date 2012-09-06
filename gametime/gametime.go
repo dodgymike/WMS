@@ -48,6 +48,7 @@ func (s FastCGIServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	now := time.Now()
 	
 	w.Header().Set("Content-Length", "1")
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 
 	if isGametime(now) {
 		w.Write([]byte("1"))
