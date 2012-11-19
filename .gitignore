@@ -1,1 +1,5 @@
 **/log/*
+
+**/config/database.yml
+
+WMSRadius/.idea/
