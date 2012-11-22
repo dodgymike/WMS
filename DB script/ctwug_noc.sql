@@ -3,7 +3,7 @@
 -- http://www.phpmyadmin.net
 --
 -- Host: localhost
--- Generation Time: Nov 22, 2012 at 10:55 AM
+-- Generation Time: Nov 22, 2012 at 11:04 AM
 -- Server version: 5.5.20
 -- PHP Version: 5.3.10
 
@@ -41,7 +41,10 @@ CREATE TABLE IF NOT EXISTS `routerboard_script_group` (
   `routerboard_id` int(11) NOT NULL,
   `script_group_id` int(11) NOT NULL,
   `assigned_by` int(11) NOT NULL,
-  PRIMARY KEY (`id`)
+  PRIMARY KEY (`id`),
+  KEY `routerboard_id` (`routerboard_id`),
+  KEY `script_group_id` (`script_group_id`),
+  KEY `assigned_by` (`assigned_by`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;
 
 -- --------------------------------------------------------
@@ -59,7 +62,8 @@ CREATE TABLE IF NOT EXISTS `routerboard_stats` (
   `fw` text NOT NULL,
   `ospf` text NOT NULL,
   `policy` text NOT NULL,
-  PRIMARY KEY (`id`)
+  PRIMARY KEY (`id`),
+  KEY `routerboard_id` (`routerboard_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;
 
 -- --------------------------------------------------------
@@ -78,7 +82,10 @@ CREATE TABLE IF NOT EXISTS `script` (
   `created` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `version` int(11) NOT NULL,
   `enabled` tinyint(1) NOT NULL,
-  PRIMARY KEY (`id`)
+  PRIMARY KEY (`id`),
+  KEY `script_group_id` (`script_group_id`),
+  KEY `script_type_id` (`script_type_id`),
+  KEY `created_by` (`created_by`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;
 
 -- --------------------------------------------------------
@@ -120,3 +127,29 @@ CREATE TABLE IF NOT EXISTS `user` (
   `is_admin` tinyint(1) NOT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;
+
+--
+-- Constraints for dumped tables
+--
+
+--
+-- Constraints for table `routerboard_script_group`
+--
+ALTER TABLE `routerboard_script_group`
+  ADD CONSTRAINT `routerboard_script_group_ibfk_1` FOREIGN KEY (`routerboard_id`) REFERENCES `routerboard` (`id`),
+  ADD CONSTRAINT `routerboard_script_group_ibfk_2` FOREIGN KEY (`script_group_id`) REFERENCES `script_group` (`id`),
+  ADD CONSTRAINT `routerboard_script_group_ibfk_3` FOREIGN KEY (`assigned_by`) REFERENCES `user` (`id`);
+
+--
+-- Constraints for table `routerboard_stats`
+--
+ALTER TABLE `routerboard_stats`
+  ADD CONSTRAINT `routerboard_stats_ibfk_1` FOREIGN KEY (`routerboard_id`) REFERENCES `routerboard` (`id`);
+
+--
+-- Constraints for table `script`
+--
+ALTER TABLE `script`
+  ADD CONSTRAINT `script_ibfk_1` FOREIGN KEY (`script_group_id`) REFERENCES `routerboard_script_group` (`id`),
+  ADD CONSTRAINT `script_ibfk_2` FOREIGN KEY (`script_type_id`) REFERENCES `script_type` (`id`),
+  ADD CONSTRAINT `script_ibfk_3` FOREIGN KEY (`created_by`) REFERENCES `user` (`id`);
