@@ -3,7 +3,7 @@
 -- http://www.phpmyadmin.net
 --
 -- Host: localhost
--- Generation Time: Nov 22, 2012 at 11:04 AM
+-- Generation Time: Nov 22, 2012 at 06:45 PM
 -- Server version: 5.5.20
 -- PHP Version: 5.3.10
 
@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS `routerboard` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `name` text NOT NULL,
   `ros_serial` text NOT NULL,
-  `last_check_in_date` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00' ON UPDATE CURRENT_TIMESTAMP,
+  `last_check_in_date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;
 
@@ -58,12 +58,16 @@ CREATE TABLE IF NOT EXISTS `routerboard_stats` (
   `routerboard_id` int(11) NOT NULL,
   `stat_date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `version` text NOT NULL,
+  `cpu` text NOT NULL,
   `freq` text NOT NULL,
+  `arch` text NOT NULL,
+  `board` text NOT NULL,
   `fw` text NOT NULL,
+  `ip` text NOT NULL,
   `ospf` text NOT NULL,
   `policy` text NOT NULL,
   PRIMARY KEY (`id`),
-  KEY `routerboard_id` (`routerboard_id`)
+  UNIQUE KEY `routerboard_id` (`routerboard_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;
 
 -- --------------------------------------------------------
