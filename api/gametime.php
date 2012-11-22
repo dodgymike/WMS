@@ -12,7 +12,6 @@
 http://noc.ctwug.za.net/web/api/gametime
 
  */
-
 // date 
 $today = getdate();
 
