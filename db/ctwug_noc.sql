@@ -11,10 +11,10 @@ SET SQL_MODE="NO_AUTO_VALUE_ON_ZERO";
 SET time_zone = "+00:00";
 
 --
--- Database: `ctwug_noc`
+-- Database: `wms`
 --
-CREATE DATABASE `ctwug_noc` DEFAULT CHARACTER SET utf8 COLLATE utf8_general_ci;
-USE `ctwug_noc`;
+-- CREATE DATABASE `wms` DEFAULT CHARACTER SET utf8 COLLATE utf8_general_ci;
+USE `wms`;
 
 -- --------------------------------------------------------
 
