@@ -11,6 +11,15 @@
 //sample api call
 http://noc.ctwug.za.net/web/api/firewall/firewall.rsc
 */
+include_once('config.php');
+$db = new PDO("mysql:host=$DBHOST;dbname=$DBNAME", $DBUSER,$DBPASS);
+
+$IPaddr = $_SERVER['REMOTE_ADDR'];
+
+
+$stmt = $db->prepare("INSERT into firewall (ipaddr,lastseen) values (INET_ATON(?),CURRENT_TIMESTAMP()) ON DUPLICATE KEY UPDATE lastseen = CURRENT_TIMESTAMP()");
+$stmt->execute(array($IPaddr));
+
 ?>
 /ip firewall mangle
 :local fw

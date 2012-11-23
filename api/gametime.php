@@ -12,6 +12,7 @@
 http://noc.ctwug.za.net/web/api/gametime
 
  */
+include_once('config.php');
 // date 
 $today = getdate();
 
@@ -22,7 +23,7 @@ $hour  = $today['hours'];
 $gametime = 0;
 
 //setup pdo mysql connection
-$db = new PDO('mysql:host=localhost;dbname=wms', 'wms', 'wms');
+$db = new PDO("mysql:host=$DBHOST;dbname=$DBNAME", $DBUSER,$DBPASS);
 
 //check if there is an entry for the existing routerboard serialnumber
 $stmt = $db->prepare("select id, dow, hour, active from game_time_schedule where dow = ? and hour = ?");
