@@ -21,7 +21,8 @@ function get($name)
 }
 
 //setup pdo mysql connection
-$db = new PDO('mysql:host=localhost;dbname=wms', 'wms', 'wms');
+include_once('config.php');
+$db = new PDO("mysql:host=$DBHOST;dbname=$DBNAME", $DBUSER,$DBPASS);
 
 //get parameters
 $id = get("id");
