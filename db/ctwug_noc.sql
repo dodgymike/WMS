@@ -166,6 +166,6 @@ ALTER TABLE `routerboard_stats`
 -- Constraints for table `script`
 --
 ALTER TABLE `script`
-  ADD CONSTRAINT `script_ibfk_1` FOREIGN KEY (`script_group_id`) REFERENCES `routerboard_script_group` (`id`),
+  ADD CONSTRAINT `script_ibfk_1` FOREIGN KEY (`script_group_id`) REFERENCES `script_group` (`id`),
   ADD CONSTRAINT `script_ibfk_2` FOREIGN KEY (`script_type_id`) REFERENCES `script_type` (`id`),
   ADD CONSTRAINT `script_ibfk_3` FOREIGN KEY (`created_by`) REFERENCES `user` (`id`);
