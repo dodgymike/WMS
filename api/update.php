@@ -14,6 +14,7 @@ http://noc.ctwug.za.net/web/api/update?id=".$fid."&serial=".$fserial."&update=2&
  */
 //setup pdo mysql connection
 include_once('config.php');
+header('Content-Type: text/plain');
 
 //helper function
 function get($name)

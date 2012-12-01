@@ -12,6 +12,7 @@
 http://noc.ctwug.za.net/web/api/firewall/firewall.rsc
 */
 include_once('config.php');
+header('Content-Type: text/plain');
 $db = new PDO("mysql:host=$DBHOST;dbname=$DBNAME", $DBUSER,$DBPASS);
 
 //Get the ip and record it in the db
