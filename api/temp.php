@@ -11,4 +11,5 @@
 http://noc.ctwug.za.net/web/api/temp?id=FID&serial=SERIAL
 
 */
+header('Content-Type: text/plain');
 echo 'done';

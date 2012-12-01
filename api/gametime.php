@@ -13,6 +13,7 @@ http://noc.ctwug.za.net/web/api/gametime
 
  */
 include_once('config.php');
+header('Content-Type: text/plain');
 // date 
 $today = getdate();
 
