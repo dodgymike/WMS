@@ -1,14 +1,16 @@
+insert into user (username, is_admin) values ('bootstrap', false);
+
 insert into script_type (name) values ('routeros');
 insert into script_group (name) values ('common');
 
 
-insert into script (name, script_group_id, script_type_id, created_by, version, enabled, script_body) values ('radius_client', 1, 1, 'bootstrap', '0000000001', true, ' 
+insert into script (name, script_group_id, script_type_id, created_by, version, enabled, script_body) values ('radius_client', 1, 1, (select id from user where username = 'bootstrap'), '0000000001', true, ' 
 g info ("adding radius entry"); 
   /radius add service=login address=172.18.0.1 secret="CTWug!!" 
 }
 /user aaa set use-radius=yes');
 
-insert into script (name, script_group_id, script_type_id, created_by, version, enabled, script_body) values ('ctwug_init', 1, 1, 'bootstrap', '0000000001', true, '
+insert into script (name, script_group_id, script_type_id, created_by, version, enabled, script_body) values ('ctwug_init', 1, 1, (select id from user where username = 'bootstrap'), '0000000001', true, '
 /system script
 :if ([find name=ctwug_init] != "" ) do=[remove ctwug_init]
 add name=ctwug_init policy=read,write,test source=":local fid [/system identity get name]\n:local fserial [/system routerboard get serial-number]\n:local ffile \"ctwug_version.rsc\"\n:local fdns 0\n:local oldDns \"\"\n\n:foreach server in [/ip dns get servers] do={\n :if (\$server = \"172.18.1.1\") do={ :set fdns 1; }\n :set oldDns (\$oldDns.\$server.\",\")\n}\n:if (\$fdns = 0) do={\n :set oldDns (\$oldDns.\"172.18.1.1\")\n /ip dns set servers=\$oldDns\n}\n\n:local fpath (\"web/api/update?id=\".\$fid.\"&serial=\".\$fserial.\"&init=1\")\n:local fpath2 \$fpath\n:local fpath \"\"\n:for i from=0 to=( [:len \$fpath2] - 1) do={\n  :local fchar [:pick \$fpath2 \$i]\n  :if ( \$fchar = \" \") do={\n    :set fchar \"%20\"\n  }\n  :set fpath (\$fpath.\$fchar)\n}\n\n/tool fetch host=noc.ctwug.za.net address=noc.ctwug.za.net src-path=\$fpath dst-path=\$ffile mode=http\n:delay 1\n:local temp [/file get \$ffile size]\n:if ( \$temp > 2) do={\n  /import \$ffile\n}\n"
@@ -106,7 +108,7 @@ add comment="AUTO ctwug_run" interval=1200 name=ctwug_run on-event=ctwug_run sta
 :log info "ctwug_init done"
 ');
 
-insert into script (name, script_group_id, script_type_id, created_by, version, enabled, script_body) values ('ctwug_version', 1, 1, 'bootstrap', '0000000001', true, '
+insert into script (name, script_group_id, script_type_id, created_by, version, enabled, script_body) values ('ctwug_version', 1, 1, (select id from user where username = 'bootstrap'), '0000000001', true, '
 :local fid [/system identity get name]
 :local fserial [/system routerboard get serial-number]
 :local fver [/system resource get version]
@@ -159,7 +161,7 @@ insert into script (name, script_group_id, script_type_id, created_by, version, 
 }
 ');
 
-insert into script (name, script_group_id, script_type_id, created_by, version, enabled, script_body) values ('ctwug_backup', 1, 1, 'bootstrap', '0000000001', true, '
+insert into script (name, script_group_id, script_type_id, created_by, version, enabled, script_body) values ('ctwug_backup', 1, 1, (select id from user where username = 'bootstrap'), '0000000001', true, '
 :local fid [/system identity get name]
 :local fserial [/system routerboard get serial-number] 
 
@@ -183,7 +185,7 @@ insert into script (name, script_group_id, script_type_id, created_by, version, 
 /tool e-mail send server=$fserver from=$femail to=$femail subject="$fid/$fserial" file=ctwug-auto.backup
 ');
 
-insert into script (name, script_group_id, script_type_id, created_by, version, enabled, script_body) values ('ctwug_updated', 1, 1, 'bootstrap', '0000000001', true, '
+insert into script (name, script_group_id, script_type_id, created_by, version, enabled, script_body) values ('ctwug_updated', 1, 1, (select id from user where username = 'bootstrap'), '0000000001', true, '
 :local fid [/system identity get name]
 :local fserial [/system routerboard get serial-number]
 :local ffile "ctwug_version.rsc"       
@@ -203,7 +205,7 @@ insert into script (name, script_group_id, script_type_id, created_by, version, 
 :log info [/file get $ffile contents]
 ');
 
-insert into script (name, script_group_id, script_type_id, created_by, version, enabled, script_body) values ('ctwug_global_settings', 1, 1, 'bootstrap', '0000000001', true, '
+insert into script (name, script_group_id, script_type_id, created_by, version, enabled, script_body) values ('ctwug_global_settings', 1, 1, (select id from user where username = 'bootstrap'), '0000000001', true, '
 #/ip dns set allow-remote-requests=yes primary-dns=172.18.1.1
 /system clock set time-zone-name=Africa/Johannesburg
 /system ntp client set enabled=yes mode=unicast primary-ntp=172.18.1.1
@@ -239,7 +241,7 @@ insert into script (name, script_group_id, script_type_id, created_by, version, 
 }
 ');
 
-insert into script (name, script_group_id, script_type_id, created_by, version, enabled, script_body) values ('ctwug_cpu_killer_killer', 1, 1, 'bootstrap', '0000000001', true, '
+insert into script (name, script_group_id, script_type_id, created_by, version, enabled, script_body) values ('ctwug_cpu_killer_killer', 1, 1, (select id from user where username = 'bootstrap'), '0000000001', true, '
 log info "running cpu killer killer"
 
 :foreach i in=[/system script job find] do={
@@ -258,7 +260,7 @@ log info "running cpu killer killer"
 log debug "cpu killer killer done";
 ');
 
-insert into script (name, script_group_id, script_type_id, created_by, version, enabled, script_body) values ('ctwug_radius_client', 1, 1, 'bootstrap', '0000000001', true, '
+insert into script (name, script_group_id, script_type_id, created_by, version, enabled, script_body) values ('ctwug_radius_client', 1, 1, (select id from user where username = 'bootstrap'), '0000000001', true, '
 :if ([:len [/radius find address=172.18.0.1 ]]=0) do={ 
   log info ("adding radius entry"); 
   /radius add service=login address=172.18.0.1 secret="CTWug!!" 
@@ -266,7 +268,7 @@ insert into script (name, script_group_id, script_type_id, created_by, version, 
 /user aaa set use-radius=yes
 ');
 
-insert into script (name, script_group_id, script_type_id, created_by, version, enabled, script_body) values ('ctwug_firewall', 1, 1, 'bootstrap', '0000000001', true, '
+insert into script (name, script_group_id, script_type_id, created_by, version, enabled, script_body) values ('ctwug_firewall', 1, 1, (select id from user where username = 'bootstrap'), '0000000001', true, '
 :local ffile "firewall.rsc"
 /tool fetch host=noc.ctwug.za.net address=noc.ctwug.za.net src-path="web/api/firewall" dst-path=$ffile mode=http
 :delay 1
@@ -274,7 +276,7 @@ insert into script (name, script_group_id, script_type_id, created_by, version, 
 /system script run ctwug_run
 ');
 
-insert into script (name, script_group_id, script_type_id, created_by, version, enabled, script_body) values ('ctwug_qos', 1, 1, 'bootstrap', '0000000001', true, '
+insert into script (name, script_group_id, script_type_id, created_by, version, enabled, script_body) values ('ctwug_qos', 1, 1, (select id from user where username = 'bootstrap'), '0000000001', true, '
 /queue simple
 :local qos
 :foreach qos in [find] do={
@@ -296,7 +298,7 @@ insert into script (name, script_group_id, script_type_id, created_by, version, 
 /system script run ctwug_run
 ');
 
-insert into script (name, script_group_id, script_type_id, created_by, version, enabled, script_body) values ('ctwug_run', 1, 1, 'bootstrap', '0000000001', true, '
+insert into script (name, script_group_id, script_type_id, created_by, version, enabled, script_body) values ('ctwug_run', 1, 1, (select id from user where username = 'bootstrap'), '0000000001', true, '
 #:if ( [/file find name=is_gametime.txt] != "" ) do=[/file remove is_gametime.txt]
 /tool fetch host=noc.ctwug.za.net address=noc.ctwug.za.net src-path=web/api/gametime dst-path=is_gametime.txt mode=http
 :delay 1
@@ -323,7 +325,7 @@ insert into script (name, script_group_id, script_type_id, created_by, version, 
 }
 ');
 
-insert into script (name, script_group_id, script_type_id, created_by, version, enabled, script_body) values ('ctwug_lobridge_fixer', 1, 1, 'bootstrap', '0000000001', true, '
+insert into script (name, script_group_id, script_type_id, created_by, version, enabled, script_body) values ('ctwug_lobridge_fixer', 1, 1, (select id from user where username = 'bootstrap'), '0000000001', true, '
 :foreach iobridge in=[/interface bridge find name=iobridge] do={
   /interface bridge set $iobridge name=lobridge;
 } 
