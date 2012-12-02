@@ -60,9 +60,9 @@ while ($row = $stmt->fetch())
 	' jump-target='.$row[6]. 
 	' protocol='.$row[5]; 
 
-//Don't echo protocol and passthrough if they are NULL
+//Don't echo port and passthrough if they are NULL
 	if (isset($row[8])){
-	echo " protocol=".$row[8];
+	echo " portl=".$row[8];
 	}
 	if (isset($row[7])) {
 	echo ' passthrough='.$row[7] . "\r\n"; }
