@@ -62,7 +62,7 @@ while ($row = $stmt->fetch())
 
 //Don't echo port and passthrough if they are NULL
 	if (isset($row[8])){
-	echo " portl=".$row[8];
+	echo " port=".$row[8];
 	}
 	if (isset($row[7])) {
 	echo ' passthrough='.$row[7] . "\r\n"; }
