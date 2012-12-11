@@ -1,0 +1,23 @@
+/tool fetch address=wms.ctwug.za.net host=wms.ctwug.za.net src-path=api/gametime dst-path=is_gametime.txt mode=http
+:delay 1
+:local temp [/file get is_gametime.txt contents]
+:local fdisabled no
+:if ($temp = 0) do={:set fdisabled yes} 
+
+/queue simple
+:local qos
+:foreach qos in [find disabled!=$fdisabled] do={
+ :if ( [:pick [get $qos comment] 0 4] = "AUTO" ) do=[set $qos disabled=$fdisabled]
+}
+
+/interface
+:local iface
+:foreach iface in [find disabled=no] do={
+ :if ( [:pick [get $iface comment] 0 4] = "qos;" ) do=[ :set fdisabled no]
+}
+
+/ip firewall mangle
+:local fw
+:foreach fw in [find disabled!=$fdisabled] do={
+ :if ( [:pick [get $fw comment] 0 4] = "AUTO" ) do=[set $fw disabled=$fdisabled]
+}

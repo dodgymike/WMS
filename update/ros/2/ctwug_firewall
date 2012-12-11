@@ -1,0 +1,6 @@
+:local serial [/system routerboard get serial-number]
+:local ffile "firewall.rsc"
+:local apipath ("api/firewall?serial=".$serial)
+/tool fetch host=wms.ctwug.za.net address=wms.ctwug.za.net src-path=$apipath dst-path=$ffile mode=http
+:delay 1
+/import $ffile

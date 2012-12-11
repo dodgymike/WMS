@@ -1,156 +1,228 @@
 <?php
-/*
- * update.php
- * this forms part of the CTWUG NOC
- *
- * rb's will call as below and info will be persisted into a database
- *
- * Zayin Krige
- * 2012/11/22
+require_once($_SERVER['WMS_PATH'] . '/wms.php');
 
-//sample api call
-http://noc.ctwug.za.net/web/api/update?id=".$fid."&serial=".$fserial."&update=2&version=".$fver."&cpu=".$fcpu."&freq=".$fcpufreq."&arch=".$farch."&board=".$fboard."&fw=".$ffw."&ip=".$fip."&ospf=".$fospf."&policy=".$fpolicy
+class WMS_Update extends WMS {
+	private $_version;
 
- */
-//setup pdo mysql connection
-include_once('config.php');
-header('Content-Type: text/plain');
+	public function __construct () {
+		parent::__construct();
+		$this->_logmodule = 'update';
+		$this->_next = array($this, '_update_' . $this->getPlatform());
+	}
 
-//helper function
-function get($name)
-{
-    if (isset($_GET[$name])) {
-        return $_GET[$name];
-    }
-    return "";
+	private function _addDevice ($extras) {
+		$db = $this->_dbConnect();
+		$st = $db->prepare('SELECT id FROM device WHERE serial=:serial');
+		if (!$st->execute(array(':serial' => $this->_serial))) {
+			return;
+		}
+		if ($row = $st->fetch()) {
+			$update = $row['id'];
+		} else {
+			$update = 0;
+		}
+		$st->closeCursor();
+		if ($update > 0) {
+			$sql = 'UPDATE device SET ';
+			$params = array(':id' => $update);
+			foreach ($extras as $key => $val) {
+				$sql .= $key . '=:' . $key . ', ';
+				$params[':'.$key] = $val;
+			}
+			$sql .= 'last_checkin=NOW() WHERE id=:id';
+		} else {
+			$params = array(':serial' => $this->_serial, ':platform' => $this->getPlatform());
+			foreach ($extras as $key => $val) {
+				$params[':'.$key] = $val;
+			}
+			$sql = 'INSERT INTO device (';
+			$prefix = '';
+			foreach ($params as $key => $val) {
+				$sql .= $prefix . substr($key, 1);
+				$prefix = ', ';
+			}
+			$sql .= ') VALUES (';
+			$prefix = '';
+			foreach ($params as $key => $val) {
+				$sql .= $prefix . $key;
+				$prefix = ', ';
+			}
+			$sql .= ')';
+		}
+		syslog(LOG_DEBUG, $sql);
+		$st = $db->prepare($sql);
+		if (!$st->execute($params)) {
+			return;
+		}
+		$st->closeCursor();
+	}
+
+	protected function _update_ros () {
+		if (!isset($_REQUEST['ver'])) {
+			$this->_version = 0;
+		} else {
+			$ver = intval($_REQUEST['ver']);
+			if ($ver >= 1) {
+				$this->_version = $_REQUEST['ver'];
+			} else {
+				$this->_version = 0;
+			}
+		}
+		$this->_next = array($this, '_buildOutput_' . $this->getPlatform());
+		return true;
+	}
+
+	protected function _buildOutput_ros () {
+		$ppath = $_SERVER['WMS_PATH'] . '/update/ros';
+		$this->_logparam = array(
+			'ver' => $this->_version
+		);
+		if (isset($_REQUEST['curver'])) {
+			$current = intval($_REQUEST['curver']);
+		} else {
+			if (!is_link($ppath . '/current')) {
+				return false;
+			}
+			$current = intval(readlink($ppath . '/current'));
+		}
+		if ($current <= 0) {
+			return false;
+		}
+		if ($this->_version == $current) {
+			return false;
+		}
+		if (!is_dir($ppath . '/' . $current)) {
+			return false;
+		}
+		$dir = opendir($ppath . '/' . $current);
+		if (!$dir) {
+			return false;
+		}
+		$csfiles = array();
+		while (false !== ($file = readdir($dir))) {
+			if ($file{0} == '.') continue;
+			if (is_file($ppath . '/' . $current . '/' . $file)) {
+				$csfiles[] = $file;
+			}
+		}
+		closedir($dir);
+		$extras = array();
+		if ($this->_version == 0) {
+			$fadd = $csfiles;
+		} elseif ($this->_version > 0) {
+			foreach (array('rosver','cpu','arch','board','firmware') as $param) {
+				if (!isset($_REQUEST[$param])) {
+					continue;
+				}
+				$this->_logparam[$param] = $_REQUEST[$param];
+			}
+			if (isset($_REQUEST['rosver'])) {
+				$extras['os'] = $_REQUEST['rosver'];
+			}
+			if (isset($_REQUEST['board'])) {
+				$extras['model'] = $_REQUEST['board'];
+			}
+			if (isset($_REQUEST['name'])) {
+				$extras['name'] = $_REQUEST['name'];
+			}
+			$extras['updatever'] = $this->_version;
+			if (isset($_REQUEST['cpufreq'])) {
+				$cpufreq = $_REQUEST['cpufreq'];
+				$cpufreql = strlen($_REQUEST['cpufreq']);
+				for ($i = 0; $i < $cpufreql; $i++) {
+					if ($cpufreq{$i} == '.') {
+						continue;
+					}
+					if (!is_numeric($cpufreq{$i})) {
+						break;
+					}
+				}
+				$unit = strtolower(trim(substr($cpufreq, $i)));
+				$cpufreq = (float) substr($cpufreq, 0, $i);
+				if ($cpufreq <= 0) {
+					$this->_logparam['cpufreq'] = $_REQUEST['cpufreq'];
+				} else {
+					switch ($unit) {
+					case 'mhz':
+						break;
+					case 'ghz':
+						$cpufreq = intval($cpufreq * 1000);
+						break;
+					case 'khz':
+						$cpufreq = intval($cpufreq / 1000);
+						break;
+					}
+					$this->_logparam['cpufreq'] = $cpufreq;
+				}
+			}
+			$osfiles = array();
+			if (is_dir($ppath . '/' . $this->_version)) {
+				$dir = opendir($ppath . '/' . $this->_version);
+				if ($dir) {
+					while (false !== ($file = readdir($dir))) {
+						if ($file{0} == '.') continue;
+						if (is_file($ppath . '/' . $this->_version . '/' . $file)) {
+							$osfiles[] = $file;
+						}
+					}
+					closedir($dir);
+				}
+			}
+			$fremove = array_diff($osfiles, $csfiles);
+			$fadd = array_diff($csfiles, $osfiles);
+			$dfiles = array_intersect($osfiles, $csfiles);
+			foreach ($dfiles as $dfile) {
+				$odfile = file_get_contents($ppath . '/' . $this->_version . '/' . $dfile);
+				$cdfile = file_get_contents($ppath . '/' . $current . '/' . $dfile);
+				if ($odfile != $cdfile) {
+					$fremove[] = $dfile;
+					$fadd[] = $dfile;
+				}
+			}
+		}
+		$this->_addDevice($extras);
+?>
+/system script
+<?php
+		if (!isset($fremove)):
+?>
+:foreach n in [find where name~"^ctwug_.*"] do={remove $n}
+<?php
+		else:
+			foreach ($fremove as $file):
+?>
+remove [find where name="<?php echo $file; ?>"]
+<?php
+			endforeach;
+		endif;
+		if (isset($fadd)):
+			foreach ($fadd as $file):
+				echo 'add name="' . $file . '"';
+				echo ' policy=policy=reboot,read,write,policy,test,password,sensitive';
+				echo ' source="' . $this->_serialiseScript($ppath . '/' . $current . '/' . $file) . '"';
+				echo "\n";
+			endforeach;
+			foreach (array('ctwug_update','ctwug_global_settings','ctwug_qos','ctwug_firewall') as $file):
+				if (in_array($file, $fadd)):
+					echo 'run ' . $file . "\n";
+				endif;
+			endforeach;
+		endif;
+
+		return true;
+	}
+
+	private function _serialiseScript ($file) {
+		if (!is_file($file)) {
+			return '';
+		}
+		$contents = file_get_contents($file);
+		if ($contents === false) {
+			return '';
+		}
+		return str_replace(array("\r\n", "\n\r", "\r", "\n"), '\n', $contents);
+	}
 }
 
-class updateApi
-{
-    private $db;
-
-    function __construct()
-    {
-        global $DBHOST, $DBNAME, $DBUSER, $DBPASS;
-        $this->db = new PDO("mysql:host=$DBHOST;dbname=$DBNAME", $DBUSER, $DBPASS);
-    }
-
-
-    private function getScriptsForGroup($script_group_id)
-    {
-        $id = get("id");
-        $update = get("update");
-        $init = get("init");
-        $sql = "SELECT * FROM script WHERE script_group_id = ?";
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute(array($script_group_id));
-        $rows = $stmt->fetchAll(PDO::FETCH_CLASS);
-        foreach ($rows as $row) {
-            echo($row->script_body);
-        }
-    }
-
-    private function getScriptsForRB($routerboard_id)
-    {
-        $sql = "SELECT script_group_id FROM routerboard_script_group WHERE routerboard_id = ?";
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute(array($routerboard_id));
-        $rows = $stmt->fetchAll(PDO::FETCH_CLASS);
-        foreach ($rows as $row) {
-            $this->getScriptsForGroup($row->script_group_id);
-        }
-    }
-
-    private function dumpScripts()
-    {
-        $serial = get("serial");
-
-        $stmt = $this->db->prepare("SELECT id FROM routerboard WHERE ros_serial = ?");
-        $stmt->execute(array($serial));
-        $routerboard_id = 0;
-        if ($stmt->rowCount() > 0) {
-            //this rb exists in the db
-            $rows = $stmt->fetchAll(PDO::FETCH_CLASS);
-            $routerboard_id = $rows[0]->id;
-        }
-        if ($routerboard_id != 0) {
-            $this->getScriptsForRB($routerboard_id);
-        } else {
-            echo "No database entry for this routerboard. Please first update your info";
-        }
-    }
-
-    private function saveRBInfo()
-    {
-        $id = get("id");
-        $serial = get("serial");
-        $version = get("version");
-        $cpu = get("cpu");
-        $freq = get("freq");
-        $arch = get("arch");
-        $board = get("board");
-        $fw = get("fw");
-        $ip = get("ip");
-        $ospf = get("ospf");
-        $policy = get("policy");
-        //check if there is an entry for the existing routerboard serialnumber
-        $stmt = $this->db->prepare("SELECT * FROM routerboard WHERE ros_serial = ?");
-        $stmt->execute(array($serial));
-        $routerboard_id = 0;
-        if ($stmt->rowCount() > 0) {
-            //this rb exists in the db
-            $rows = $stmt->fetchAll(PDO::FETCH_CLASS);
-            $routerboard_id = $rows[0]->id;
-            //so update
-            $sql = "update routerboard set name = ? where ros_serial = ?";
-            $stmt = $this->db->prepare($sql);
-            $stmt->execute(array($id, $serial));
-        } else {
-            //this rb doesnt existin the db
-            $sql = "insert into routerboard (name, ros_serial) values (?,?)";
-            $stmt = $this->db->prepare($sql);
-            $stmt->execute(array($id, $serial));
-            $routerboard_id == $this->db->lastInsertId();
-        }
-        //update rb stats
-
-        //is there a db entry for stats for this rb
-        $sql = "select * from routerboard_stats where routerboard_id = ?";
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute(array($routerboard_id));
-        $stats_id = 0;
-        if ($stmt->rowCount() > 0) {
-            //there is so update it
-            $rows = $stmt->fetchAll(PDO::FETCH_CLASS);
-            $sql = "update routerboard_stats set version = ?, cpu=?, freq=?, arch=?, board=?, fw=?, ip=?, ospf=?, policy=? where routerboard_id = ?";
-        } else {
-            //there isnt an stats entry yet for this rb, so insert it
-            $sql = "insert into routerboard_stats (version, cpu, freq, arch, board, fw, ip, ospf, policy, routerboard_id) values (?,?,?,?,?,?,?,?,?,?)";
-        }
-        //perform the query
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute(array($version, $cpu, $freq, $arch, $board, $fw, $ip, $ospf, $policy, $routerboard_id));
-
-        //echo out the version number to the caller
-        echo $version;
-    }
-
-    function process()
-    {
-        $init = get("init");
-        if ($init != "") {
-            $this->dumpScripts();
-        } else {
-            $update = get("update");
-            if ($update == 1) {
-                $this->saveRBInfo();
-            }
-            if ($update == 2) {
-                $this->showScriptsVersion();
-            }
-        }
-    }
-}
-
-$update = new updateApi();
-$update->process();
+$wms = new WMS_Update();
+$wms->boot();

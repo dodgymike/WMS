@@ -1,0 +1,13 @@
+/queue simple
+:foreach qos in [find where comment~"^AUTO.*"] do={ remove $qos }
+
+/interface
+:foreach qos in [find where comment~"^client.*"] do={
+  :local com [get $qos comment]
+  :local name [get $qos name]
+  :local p1 ([:find $com ";"] + 1)
+  :local p2 [:find $com ";" $p1]
+  :local mb ([:pick $com $p1 $p2]*1000)
+  :local com ("AUTO ".$name." BULK")
+  /queue simple add interface=$name name=$com packet-marks=BULK comment=$com max-limit=("0/".$mb) direction=download disabled=yes
+}

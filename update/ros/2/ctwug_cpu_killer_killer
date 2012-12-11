@@ -1,0 +1,14 @@
+/log info "running cpu killer killer"
+
+:foreach i in=[/system script job find] do={
+ :local scriptname [/system script job get $i script]
+
+ :if ([:len $scriptname]=0) do={
+   /log debug "skipping empty job"
+ } else {
+   /log info "killing script: $scriptname"
+   /system script job remove $i
+ }
+}
+
+/log debug "cpu killer killer done"

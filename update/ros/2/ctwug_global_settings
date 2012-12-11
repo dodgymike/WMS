@@ -1,0 +1,65 @@
+:local found 0
+:foreach server in [/ip dns get servers] do={
+  :if ($server = "172.18.1.1") do={ :set found 1; }
+}
+:if ($found = 0) do={
+  /ip dns set servers=172.18.1.1
+}
+/system clock set time-zone-name=Africa/Johannesburg
+/system ntp client set enabled=yes mode=unicast primary-ntp=172.18.1.1
+/snmp set enabled=yes
+/ip firewall connection tracking set enabled=yes
+:if [/ip traffic-flow get enabled] do={
+  /log info "disabling netflows"
+  /ip traffic-flow set enabled=no
+}
+/radius
+:set found 0
+:foreach n in [find where service=login] do={
+  :if ([get $n address] = "172.18.0.1" && [get $n secret] = "CTWug!!") do={ :set found 1 }
+}
+:if ($found = 0) do={
+  add service=login address=172.18.0.1 secret="CTWug!!"
+}
+/user aaa
+:if (![get use-radius]) do={ set use-radius=yes }
+:set found 0
+/user group
+:foreach n in [find where name="ctwug"] do={
+  :local policy [get $n policy]
+  :for i from=0 to=([:len $policy]-1) do={
+    :local pflag [:pick $policy $i]
+    :if ($pflag != "local") do={ :set found 1 }
+    :if ($pflag != "telnet") do={ :set found 1 }
+    :if ($pflag != "ssh") do={ :set found 1 }
+    :if ($pflag != "reboot") do={ :set found 1 }
+    :if ($pflag != "read") do={ :set found 1 }
+    :if ($pflag != "test") do={ :set found 1 }
+    :if ($pflag != "winbox") do={ :set found 1 }
+    :if ($pflag != "web") do={ :set found 1 }
+    :if ($pflag != "api") do={ :set found 1 }
+    :if ($pflag != "!ftp") do={ :set found 1 }
+    :if ($pflag != "!write") do={ :set found 1 }
+    :if ($pflag != "!policy") do={ :set found 1 }
+    :if ($pflag != "!password") do={ :set found 1 }
+    :if ($pflag != "!sensitive") do={ :set found 1 }
+  }
+  :if ($found = 1) do={
+    set $n policy=local,telnet,ssh,reboot,read,test,winbox,web,api,!ftp,!write,!policy,!password,!sensitive
+  }
+}
+:if ($found = 0) do={
+  add name="ctwug" policy=local,telnet,ssh,reboot,read,test,winbox,web,api,!ftp,!write,!policy,!password,!sensitive
+}
+:set found 0
+/user
+:foreach n in [find where name="ctwug"] do={
+  :if ([get $n group] != "ctwug") do={
+    set $n group="ctwug"
+    set $n password="ctwug"
+  }
+  :set found 1
+}
+:if ($found = 0) do={
+  add name="ctwug" group="ctwug" password="ctwug"
+}

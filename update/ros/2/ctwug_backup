@@ -1,0 +1,20 @@
+:local serial [/system routerboard get serial-number] 
+
+:if ( [/file find name=ctwug-auto.backup] != "" ) do=[/file remove ctwug-auto.backup]
+:delay 1
+/system backup save name=ctwug-auto
+:local fwait 1
+:local cnt 0
+:while ( $fwait = 1 ) do={
+  :set cnt ($cnt+1)
+  :delay 5
+  if ([/file find name=ctwug-auto.backup] != "") do={ :set fwait 0; }
+  if ( $cnt = 20) do={
+    :log info "ctwug_backup FAILED"
+    :set fwait 0
+  }
+}
+:if ([/file find name=ctwug-auto.backup] != "") do={
+  /tool fetch mode=ftp upload=yes address=wms.ctwug.za.net src-path="ctwug-auto.backup" dst-path="upload/$serial.backup"
+  /file remove ctwug-auto.backup
+}
