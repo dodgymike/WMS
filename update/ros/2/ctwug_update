@@ -6,9 +6,12 @@
 :local arch [/system resource get architecture-name]
 :local board [/system resource get board-name]
 :local firmware [/system routerboard get current-firmware]
-:local ver 2
+:local ver %ver%
 :local upoln 0
 :local rscript "ctwug.rsc"
+
+/system scheduler
+:foreach n in [find where name="ctwug_update_temp"] do={ remove $n }
 
 :if ([/system script find name=ctwug_update] != "" ) do={
   :local upolicy [/system script get ctwug_update policy]

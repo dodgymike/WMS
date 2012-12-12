@@ -7,6 +7,13 @@
 }
 /system clock set time-zone-name=Africa/Johannesburg
 /system ntp client set enabled=yes mode=unicast primary-ntp=172.18.1.1
+/system scheduler
+:if ([:len [find name="ctwug_update"]] = 0) do={
+  add name="ctwug_update" interval=1h on-event="/system script run ctwug_update"
+}
+:if ([:len [find name="ctwug_gametime"]] = 0) do={
+  add name="ctwug_gametime" start-time=0:0:0 interval=20m on-event="/system script run ctwug_gametime"
+}
 /snmp set enabled=yes
 /ip firewall connection tracking set enabled=yes
 :if [/ip traffic-flow get enabled] do={
@@ -16,10 +23,13 @@
 /radius
 :set found 0
 :foreach n in [find where service=login] do={
-  :if ([get $n address] = "172.18.0.1" && [get $n secret] = "CTWug!!") do={ :set found 1 }
+  :if ([get $n address] = "172.18.0.1" && [get $n secret] = "CTWug!!") do={
+    :set found 1
+    :if ([get $n timeout] != 1s) do={ set $n timeout=1s }
+  }
 }
 :if ($found = 0) do={
-  add service=login address=172.18.0.1 secret="CTWug!!"
+  add service=login address=172.18.0.1 secret="CTWug!!" timeout=1s
 }
 /user aaa
 :if (![get use-radius]) do={ set use-radius=yes }

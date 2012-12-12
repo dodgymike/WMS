@@ -59,6 +59,9 @@ class WMS {
 			$jump = $this->_next;
 			$this->_next = null;
 			if (!is_callable($jump)) {
+				if (is_array($jump)) {
+					$this->_log(LOG_ERR, 'Uncallable jump: ' . get_class($jump[0]) . '::' . $jump[1] . '()');
+				}
 				$response = WMS::R_ERROR;
 				break;
 			}
@@ -85,7 +88,7 @@ class WMS {
 	}
 
 	private function _reqlog ($status) {
-		$msg = 'request/' . $this->_logmodule . '[' . $status . ']: ';
+		$msg = $this->_logmodule . ': request[' . $status . ']: ';
 		$msg .= $this->_getLogIP() . '[' . $this->getPlatform() . '/' . $this->_serial . ']';
 		$params = $this->_logparam;
 		if (sizeof($params) > 0) {
@@ -115,6 +118,10 @@ class WMS {
 			return $_SERVER['REMOTE_ADDR'];
 		}
 		return $_SERVER['REMOTE_ADDR'] . $xff;
+	}
+
+	protected function _log ($priority, $msg) {
+		syslog($priority, $this->_logmodule . ': ' . $msg);
 	}
 
 	protected function _dbConnect () {
