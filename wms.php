@@ -47,10 +47,6 @@ class WMS {
 			$this->bail('Unsupported platform');
 			return;
 		}
-		if (!$this->_serial) {
-			$this->bail('Missing serial number');
-			return;
-		}
 		$response = WMS::R_GOOD;
 		while (true) {
 			if (!$this->_next) {
@@ -89,7 +85,11 @@ class WMS {
 
 	private function _reqlog ($status) {
 		$msg = $this->_logmodule . ': request[' . $status . ']: ';
-		$msg .= $this->_getLogIP() . '[' . $this->getPlatform() . '/' . $this->_serial . ']';
+		$msg .= $this->_getLogIP() . '[' . $this->getPlatform();
+		if ($this->_serial) {
+			$msg .= '/' . $this->_serial;
+		}
+		$msg .= ']';
 		$params = $this->_logparam;
 		if (sizeof($params) > 0) {
 			$msg .= ' (';
@@ -135,8 +135,8 @@ class WMS {
 
 	public function bail ($msg, $code = '404') {
 		header('HTTP/1.0 ' . $code . ' ' . $msg);
-		header('Content-Length: ' . strlen($msg));
-		die($msg);
+		header('Content-Length: ' . (strlen($msg)+1));
+		die($msg . "\n");
 	}
 
 	public function getPlatform () {

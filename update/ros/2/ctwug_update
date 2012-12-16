@@ -6,12 +6,22 @@
 :local arch [/system resource get architecture-name]
 :local board [/system resource get board-name]
 :local firmware [/system routerboard get current-firmware]
+:local contact [/snmp get contact]
 :local ver %ver%
 :local upoln 0
-:local rscript "ctwug.rsc"
+:local rscript "ctwug_update.rsc"
+
+/file
+:foreach n in [find where name~"^ctwug_.*\\.rsc"] do={
+  :log info ("ctwug_update: removing file " . [get $n name])
+  remove $n
+}
 
 /system scheduler
-:foreach n in [find where name="ctwug_update_temp"] do={ remove $n }
+:foreach n in [find where name="ctwug_update_temp"] do={
+  :log info ("ctwug_update: removing scheduler " . [get $n name])
+  remove $n
+}
 
 :if ([/system script find name=ctwug_update] != "" ) do={
   :local upolicy [/system script get ctwug_update policy]
@@ -28,7 +38,10 @@
   }
 }
 
-:local path ("api/update?serial=".$serial."&ver=".$ver."&name=".$name."&rosver=".$rosver."&cpu=".$cpu."&cpufreq=".$cpufreq."&arch=".$arch."&board=".$board."&firmware=".$firmware."&policy=".$upoln)
+:local path ("api/update?serial=".$serial."&ver=".$ver."&rosver=".$rosver."&cpu=".$cpu."&cpufreq=".$cpufreq."&arch=".$arch."&board=".$board."&firmware=".$firmware."&policy=".$upoln."&name=".$name)
+:if ([:len $contact] > 5) do={
+  :set path ($path."&contact=".$contact)
+}
 :local apipath
 :local fchar
 :for i from=0 to=( [:len $path] - 1) do={

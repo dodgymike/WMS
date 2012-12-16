@@ -7,14 +7,18 @@
 :local cnt 0
 :while ( $fwait = 1 ) do={
   :set cnt ($cnt+1)
-  :delay 5
-  if ([/file find name=ctwug-auto.backup] != "") do={ :set fwait 0; }
-  if ( $cnt = 20) do={
-    :log info "ctwug_backup FAILED"
+  :delay 1
+  if ([/file find name=ctwug-auto.backup] != "") do={
     :set fwait 0
+    :log info "ctwug_backup: generated backup"
+  }
+  if ( $cnt = 20) do={
+    :set fwait 0
+    :log warning "ctwug_backup: ERROR generating backup"
   }
 }
 :if ([/file find name=ctwug-auto.backup] != "") do={
   /tool fetch mode=ftp upload=yes address=wms.ctwug.za.net src-path="ctwug-auto.backup" dst-path="upload/$serial.backup"
   /file remove ctwug-auto.backup
+  :log info "ctwug_backup: uploaded backup"
 }

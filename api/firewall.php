@@ -47,7 +47,7 @@ class WMS_Firewall extends WMS {
 			$l4rule .= ' protocol=' . $protocol;
 			if ($row['protocol'] == 6 || $row['protocol'] == 17) {
 				// TCP/UDP must specify a port
-				if ($row['port_min'] <= 0) {
+				if ($row['port_min'] < 1) {
 					continue;
 				}
 				$l4rule .= ' port=' . $row['port_min'];
@@ -58,7 +58,7 @@ class WMS_Firewall extends WMS {
 			$l4rule .= ' disabled=yes comment="AUTO ' . $row['comment'] . '"';
 			$l4rules[] = $l4rule;
 		}
-		if (sizeof($l4rules) <= 0 ) {
+		if (sizeof($l4rules) < 1 ) {
 			return false;
 		}
 		$l4rules[] = 'chain=pre-l4 action=jump jump-target=pre-bulk disabled=yes comment="AUTO catchall"';

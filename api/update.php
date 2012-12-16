@@ -12,19 +12,59 @@ class WMS_Update extends WMS {
 		$this->_next = array($this, '_doLog_' . $this->getPlatform());
 	}
 
+	private function _sanitise_updatever ($val) {
+		if (is_numeric($val) && $val >= 0 && $val < 4294967294) {
+			return true;
+		}
+		return false;
+	}
+	private function _sanitise_os ($val) {
+		if (strlen($val) < 64) {
+			return true;
+		}
+		return false;
+	}
+	private function _sanitise_model ($val) {
+		if (strlen($val) < 32) {
+			return true;
+		}
+		return false;
+	}
+	private function _sanitise_name ($val) {
+		return $this->_sanitise_model($val);
+	}
+	private function _sanitise_contact ($val) {
+		return $this->_sanitise_os($val);
+	}
+
 	private function _addDevice ($extras) {
+		// Basic input checks
+		foreach ($extras as $key => $val) {
+			$sanitise = array($this, '_sanitise_' . $key);
+			if (!is_callable($sanitise)) {
+				unset($extras[$key]);
+				continue;
+			}
+			if (!call_user_func($sanitise, $val)) {
+				unset($extras[$key]);
+			}
+		}
+		// Check if serial number already exists
 		$db = $this->_dbConnect();
 		$st = $db->prepare('SELECT id FROM device WHERE serial=:serial');
 		if (!$st->execute(array(':serial' => $this->_serial))) {
 			return;
 		}
+		// If it does, we have an update.  If not, a new insertion.
 		if ($row = $st->fetch()) {
 			$update = $row['id'];
 		} else {
 			$update = 0;
 		}
 		$st->closeCursor();
+		// Build the query
 		if ($update > 0) {
+			// Table UPDATEs
 			$sql = 'UPDATE device SET ';
 			$params = array(':id' => $update);
 			foreach ($extras as $key => $val) {
@@ -33,6 +73,7 @@ class WMS_Update extends WMS {
 			}
 			$sql .= 'last_checkin=NOW() WHERE id=:id';
 		} else {
+			// Table INSERTs
 			$params = array(':serial' => $this->_serial, ':platform' => $this->getPlatform());
 			foreach ($extras as $key => $val) {
 				$params[':'.$key] = $val;
@@ -51,6 +92,7 @@ class WMS_Update extends WMS {
 			}
 			$sql .= ')';
 		}
+		// Execute query
 		$st = $db->prepare($sql);
 		if (!$st->execute($params)) {
 			return;
@@ -59,7 +101,7 @@ class WMS_Update extends WMS {
 	}
 
 	protected function _doLog_ros () {
-		// First step is to build some data structures for logging
+		// Build some data structures for logging
 		if (!isset($_REQUEST['ver'])) {
 			$ver = 0;
 		} else {
@@ -75,6 +117,11 @@ class WMS_Update extends WMS {
 		// syslog logs raw data
 		// db stores abstracted data
 		if ($ver > 0) {
+			if (!$this->_serial) {
+				// missing this later would be ugly
+				$this->bail('Missing serial number');
+				return false;
+			}
 			foreach (array('cpu','cpufreq','arch','firmware') as $param) {
 				if (!isset($_REQUEST[$param])) {
 					continue;
@@ -90,13 +137,23 @@ class WMS_Update extends WMS {
 			if (isset($_REQUEST['name'])) {
 				$dblogm['name'] = $syslogm['name'] = $_REQUEST['name'];
 			}
+			if (isset($_REQUEST['contact'])) {
+				// E-mail address... or we hope so
+				$syslogm['contact'] = $_REQUEST['contact'];
+				$dbcontact = trim($_REQUEST['contact']);
+				if (preg_match('/^[A-Z0-9._%-]+@(?:[A-Z0-9-]+\.)+[A-Z]{2,6}$/i', $dbcontact)) {
+					$dblogm['contact'] = $dbcontact;
+				}
+			}
+			// update DB
+			$this->_addDevice($dblogm);
 		}
 		if (isset($_REQUEST['curver'])) {
 			$syslogm['curver'] = $_REQUEST['curver'];
 		}
-		// Do DB update, and setup syslog params
-		$this->_addDevice($dblogm);
+		// setup syslog params... will be logged by parent class
 		$this->_logparam = $syslogm;
+		// next stop, update calculation
 		$this->_next = array($this, '_calcUpdate_' . $this->getPlatform());
 		return true;
 	}
@@ -133,6 +190,8 @@ class WMS_Update extends WMS {
 			$this->_log(LOG_ERR, 'current dir read error');
 			return false;
 		}
+		// Reset $this->_version to the current script version, our target version
+		$this->_version = $current;
 		// Let the calculations begin
 		$csfiles = array();
 		while (false !== ($file = readdir($dir))) {
@@ -195,9 +254,15 @@ class WMS_Update extends WMS {
 				$fadd[$dfile] = $spath . '/' . $current . '/' . $dfile;
 			}
 		}
+		// ctwug_update contains a %ver% macro,
+		// consequently it must _always_ be refreshed
+		// when the version changes.
+		if (!isset($fadd['ctwug_update'])) {
+			$fremove['ctwug_update'] = true;
+			$fadd['ctwug_update'] = $spath . '/' . $current . '/ctwug_update';
+		}
 		$this->_add = $fadd;
 		$this->_remove = $fremove;
-		$this->_version = $current;
 		// Ready for output generation!
 		return true;
 	}
@@ -207,10 +272,28 @@ class WMS_Update extends WMS {
 		if (!isset($this->_remove)):
 			$virgin = true;
 ?>
+:put ""
+:put "Backing up existing configuration to ctwug-prejoin.backup"
+/system backup save name=ctwug-prejoin
+:local fwait 1
+:local cnt 0
+:while ($fwait = 1) do={
+  :set cnt ($cnt+1)
+  :delay 1
+  if ([/file find name=ctwug-prejoin.backup] != "") do={
+    :set fwait 0
+  }
+  if ($cnt >= 20) do={
+    :set fwait 0
+    :error "Backup failed!  Aborting."
+  }
+}
+:put "Seeking and destroying old scripts"
 /system scheduler;
 :foreach n in [find name~"^ctwug_.*"] do={remove $n};
 /system script;
 :foreach n in [find name~"^ctwug_.*"] do={remove $n};
+:foreach n in [find name="radius_client"] do={remove $n};
 <?php
 		else:
 ?>
@@ -226,12 +309,18 @@ class WMS_Update extends WMS {
 			$add = $this->_add;
 			foreach ($add as $file => $path):
 ?>
+<?php if ($virgin): ?>
+:put "Adding script <?php echo $file; ?>";
+<?php endif; ?>
 add name="<?php echo $file; ?>" policy=reboot,read,write,policy,test,password,sensitive source="<?php echo $this->_serialiseScript($path); ?>";
 <?php
 			endforeach;
 			foreach (array('ctwug_global_settings','ctwug_qos') as $file):
 				if (isset($add[$file])):
 ?>
+<?php if ($virgin): ?>
+:put "Running script <?php echo $file; ?>";
+<?php endif; ?>
 run <?php echo $file; ?>;
 <?php
 				endif;
@@ -248,14 +337,24 @@ run <?php echo $file; ?>;
 				// make it run every day some time between 1:00 and 2:00
 				$randstart = (60 * rand(0, 60)) + 3600;
 ?>
-/system scheduler add name="ctwug_backup" interval=1d start-time=[:totime <?php echo $randstart; ?>] on-event="/system script run ctwug_backup"
+:put "Adding ctwug_backup to scheduler";
+/system scheduler add name="ctwug_backup" interval=1d start-time=[:totime <?php echo $randstart; ?>] on-event="/system script run ctwug_backup";
 <?php
 			endif;
 		endif;
 // always run ctwug_firewall and ctwug_gametime when we send an update
 ?>
+<?php if ($virgin): ?>
+:put "Running script ctwug_firewall";
+<?php endif; ?>
 run ctwug_firewall;
+<?php if ($virgin): ?>
+:put "Running script ctwug_gametime";
+<?php endif; ?>
 run ctwug_gametime;
+<?php if ($virgin): ?>
+:put "Welcome to CTWUG!";
+<?php endif; ?>
 <?php
 		return true;
 	}
@@ -271,8 +370,8 @@ run ctwug_gametime;
 		if ($contents === false) {
 			return '';
 		}
-		$needles = array("\r\n", "\n\r", "\r", "\n", '"', '$', '%ver%');
-		$pins = array('\n', '\n', '\n', '\n', '\"', '\$', $ver);
+		$needles = array('\\', "\r\n", "\n\r", "\r", "\n", '"', '$', '%ver%');
+		$pins = array('\\\\', '\n', '\n', '\n', '\n', '\"', '\$', $ver);
 		return str_replace($needles, $pins, $contents);
 	}
 

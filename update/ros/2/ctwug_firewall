@@ -1,6 +1,21 @@
 :local serial [/system routerboard get serial-number]
-:local ffile "firewall.rsc"
+:local ffile "ctwug_firewall.rsc"
 :local apipath ("api/firewall?serial=".$serial)
 /tool fetch host=wms.ctwug.za.net address=wms.ctwug.za.net src-path=$apipath dst-path=$ffile mode=http
+:log info "ctwug_firewall: fetched firewall script"
 :delay 1
+# Disable some logging... prevents ALOT of noise from being logged
+/system logging
+:foreach log in [find] do={
+  :foreach topic in [get $log topics] do={
+    :if ($topic = "info" || $topic = "system") do={ disable $log }
+  }
+}
 /import $ffile
+# Re-enable logging
+:foreach log in [find] do={
+  :foreach topic in [get $log topics] do={
+    :if ($topic = "info" || $topic = "system") do={ enable $log }
+  }
+}
+:log info "ctwug_firewall: imported firewall script"

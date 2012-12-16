@@ -12,8 +12,7 @@
 http://noc.ctwug.za.net/web/api/gametime
 
  */
-include_once('config.php');
-header('Content-Type: text/plain');
+require_once($_SERVER['WMS_PATH'] . '/config.php');
 // date 
 $today = getdate();
 
@@ -34,5 +33,7 @@ if ($stmt->rowCount() >0) {
     $gametime = $rows[0]->active;
 }
 
+header('Content-Type: plain/text');
+header('Content-Length: 1');
 // is it gametime?
 echo $gametime;
