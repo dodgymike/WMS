@@ -16,8 +16,23 @@
  :if ( [:pick [get $iface comment] 0 4] = "qos;" ) do=[ :set fdisabled no]
 }
 
+# Disable some logging... prevents ALOT of noise from being logged
+/system logging
+:foreach log in [find] do={
+  :foreach topic in [get $log topics] do={
+    :if ($topic = "info" || $topic = "system") do={ disable $log }
+  }
+}
 /ip firewall mangle
 :local fw
 :foreach fw in [find disabled!=$fdisabled] do={
  :if ( [:pick [get $fw comment] 0 4] = "AUTO" ) do=[set $fw disabled=$fdisabled]
 }
+# Re-enable logging
+/system logging
+:foreach log in [find] do={
+  :foreach topic in [get $log topics] do={
+    :if ($topic = "info" || $topic = "system") do={ enable $log }
+  }
+}
+

@@ -13,6 +13,7 @@
 }
 /import $ffile
 # Re-enable logging
+/system logging
 :foreach log in [find] do={
   :foreach topic in [get $log topics] do={
     :if ($topic = "info" || $topic = "system") do={ enable $log }
