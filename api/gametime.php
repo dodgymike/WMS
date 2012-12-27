@@ -33,7 +33,7 @@ if ($stmt->rowCount() >0) {
     $gametime = $rows[0]->active;
 }
 
-header('Content-Type: plain/text');
+header('Content-Type: text/plain');
 header('Content-Length: 1');
 // is it gametime?
 echo $gametime;

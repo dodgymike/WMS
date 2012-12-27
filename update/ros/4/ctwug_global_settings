@@ -12,6 +12,14 @@
   set servers=$dnsser
 }
 
+# Remove static DNS entries from NOC migration
+/ip dns static
+:foreach n in [find where address=172.18.1.10] do={
+  :local name [get $n name]
+  :if ($name = "noc.ctwug.za.net") do={ remove $n; }
+  :if ($name = "web.ctwug.za.net") do={ remove $n; }
+}
+
 # Setup the clock
 /system clock
 :if ([get time-zone-name] != "Africa/Johannesburg") do={

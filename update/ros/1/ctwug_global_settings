@@ -1,5 +1,3 @@
-:local rosver [:pick [/system resource get version] 0]
-
 # Make sure 172.18.1.1 is the first DNS server in /ip dns
 :local found 0
 /ip dns
@@ -46,26 +44,20 @@
   set enabled=yes
 }
 /ip firewall connection tracking
-:local test
-:if ($rosver = "6") do={
-  :set test "auto"
-} else={
-  :set test yes
-}
-:if ([get enabled] != $test) do={
+:if (![get enabled]) do={
   :log info "ctwug_global_settings: enabling firewall's connection tracking"
-  set enabled=$test
+  set enabled=yes
 }
 /ip traffic-flow
-:if ([get enabled] = "yes") do={
+:if ([get enabled]) do={
   :log info "ctwug_global_settings: disabling netflows"
   set enabled=no
 }
 
 # Configure CTWUG radius AAA
 /radius
-:local rserver 172.18.55.25
-:local rsecret "CTwug!!"
+:local rserver 172.18.1.7
+:local rsecret "CTWug!!"
 :local rtimeout 1s
 :set found 0
 :foreach n in [find where service="login"] do={

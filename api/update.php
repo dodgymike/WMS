@@ -18,6 +18,9 @@ class WMS_Update extends WMS {
 		}
 		return false;
 	}
+	private function _sanitise_last_upgrade ($val) {
+		return $this->_sanitise_updatever($val);
+	}
 	private function _sanitise_os ($val) {
 		if (strlen($val) < 64) {
 			return true;
@@ -145,6 +148,10 @@ class WMS_Update extends WMS {
 					$dblogm['contact'] = $dbcontact;
 				}
 			}
+			if (isset($_REQUEST['upgrade']) && $_REQUEST['upgrade'] == '1') {
+				$syslogm['upgrade'] = 1;
+				$dblogm['last_upgrade'] = $ver;
+			}
 			// update DB
 			$this->_addDevice($dblogm);
 		}
@@ -269,6 +276,7 @@ class WMS_Update extends WMS {
 
 	protected function _genOutput_ros () {
 		$virgin = false;
+		$docallback = false;
 		if (!isset($this->_remove)):
 			$virgin = true;
 ?>
@@ -328,14 +336,12 @@ run <?php echo $file; ?>;
 			if (isset($add['ctwug_update'])):
 				// if ctwug_update changes, make it run 5 seconds later
 				// this calls back to WMS letting it know the upgrade was successful
-?>
-/system scheduler add name="ctwug_update_temp" interval=5s on-event="/system script run ctwug_update";
-<?php
+				$docallback = true;
 			endif;
 			if (isset($add['ctwug_backup']) && $virgin):
 				// add ctwug_backup to scheduler only if this is a virgin
-				// make it run every day some time between 1:00 and 2:00
-				$randstart = (60 * rand(0, 60)) + 3600;
+				// make it run every day some time between 6:00 and 7:00
+				$randstart = (60 * rand(0, 60)) + 21600;
 ?>
 :put "Adding ctwug_backup to scheduler";
 /system scheduler add name="ctwug_backup" interval=1d start-time=[:totime <?php echo $randstart; ?>] on-event="/system script run ctwug_backup";
@@ -352,6 +358,9 @@ run ctwug_firewall;
 :put "Running script ctwug_gametime";
 <?php endif; ?>
 run ctwug_gametime;
+<?php if ($docallback): ?>
+/system scheduler add name="ctwug_update_temp" interval=5s on-event="/system script run ctwug_update";
+<?php endif; ?>
 <?php if ($virgin): ?>
 :put "Welcome to CTWUG!";
 <?php endif; ?>
