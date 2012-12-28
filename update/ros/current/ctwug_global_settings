@@ -1,3 +1,5 @@
+:local rosver [:pick [/system resource get version] 0]
+
 # Make sure 172.18.1.1 is the first DNS server in /ip dns
 :local found 0
 /ip dns
@@ -8,6 +10,14 @@
   :log info "ctwug_global_settings: adding 172.18.1.1 to DNS servers"
   :local dnsser ("172.18.1.1",[get servers])
   set servers=$dnsser
+}
+
+# Remove static DNS entries from NOC migration
+/ip dns static
+:foreach n in [find where address=172.18.1.10] do={
+  :local name [get $n name]
+  :if ($name = "noc.ctwug.za.net") do={ remove $n; }
+  :if ($name = "web.ctwug.za.net") do={ remove $n; }
 }
 
 # Setup the clock
@@ -44,20 +54,26 @@
   set enabled=yes
 }
 /ip firewall connection tracking
-:if (![get enabled]) do={
+:local test
+:if ($rosver = "6") do={
+  :set test "auto"
+} else={
+  :set test yes
+}
+:if ([get enabled] != $test) do={
   :log info "ctwug_global_settings: enabling firewall's connection tracking"
-  set enabled=yes
+  set enabled=$test
 }
 /ip traffic-flow
-:if ([get enabled]) do={
+:if ([get enabled] = "yes") do={
   :log info "ctwug_global_settings: disabling netflows"
   set enabled=no
 }
 
 # Configure CTWUG radius AAA
 /radius
-:local rserver 172.18.1.7
-:local rsecret "CTWug!!"
+:local rserver 172.18.55.25
+:local rsecret "CTwug!!"
 :local rtimeout 1s
 :set found 0
 :foreach n in [find where service="login"] do={
@@ -71,11 +87,12 @@
     :if ([get $n secret] != $rsecret) do={ :set found 0 }
     :if ([get $n timeout] != $rtimeout) do={ :set found 0 }
     :if ([get $n comment] != "CTWUG") do={ :set found 0 }
+    :if ([:len [get $n src-address]] != 0) do={ :set found 0 }
   }
   :if ($found = 0) do={
     :log info "ctwug_global_settings: updating radius login server"
     :set found 1
-    set $n comment="CTWUG" address=$rserver secret=$rsecret timeout=$rtimeout
+    set $n comment="CTWUG" address=$rserver secret=$rsecret timeout=$rtimeout src-address=0.0.0.0
   }
 }
 :if ($found = 0) do={
@@ -113,17 +130,18 @@
     :if ($pflag = "web") do={ :set poln ($poln+2048) }
     :if ($pflag = "sniff") do={ :set poln ($poln+4096) }
     :if ($pflag = "sensitive") do={ :set poln ($poln+8192) }
-    :if ($pflag = "api") do={ :set poln ($poln+16384) }
+# only valid for 5.x
+#    :if ($pflag = "api") do={ :set poln ($poln+16384) }
   }
-  :if ($poln != 19255) do={
+  :if ($poln != 2871) do={
     :log info "ctwug_global_settings: setting policy on ctwug group"
-    set $n policy=local,telnet,ssh,reboot,read,test,winbox,web,api,!ftp,!write,!policy,!password,!sensitive
+    set $n policy=local,telnet,ssh,reboot,read,test,winbox,web,!ftp,!write,!policy,!password,!sensitive
   }
   :set found 1
 }
 :if ($found = 0) do={
   :log info "ctwug_global_settings: adding ctwug group"
-  add name="ctwug" policy=local,telnet,ssh,reboot,read,test,winbox,web,api,!ftp,!write,!policy,!password,!sensitive
+  add name="ctwug" policy=local,telnet,ssh,reboot,read,test,winbox,web,!ftp,!write,!policy,!password,!sensitive
 }
 :set found 0
 /user

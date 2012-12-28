@@ -18,7 +18,7 @@ class WMS_Update extends WMS {
 		}
 		return false;
 	}
-	private function _sanitise_last_upgrade ($val) {
+	private function _sanitise_upgradever ($val) {
 		return $this->_sanitise_updatever($val);
 	}
 	private function _sanitise_os ($val) {
@@ -39,6 +39,12 @@ class WMS_Update extends WMS {
 	private function _sanitise_contact ($val) {
 		return $this->_sanitise_os($val);
 	}
+	private function _sanitise_ipaddress ($val) {
+		if (strlen($val) < 40) {
+			return true;
+		}
+		return false;
+	}
 
 	private function _addDevice ($extras) {
 		// Basic input checks
@@ -46,9 +52,11 @@ class WMS_Update extends WMS {
 			$sanitise = array($this, '_sanitise_' . $key);
 			if (!is_callable($sanitise)) {
 				unset($extras[$key]);
+				$this->_log(LOG_ERR, __CLASS__ . '::' . __FUNCTION__ . '(): no sanitiser for key: ' . $key);
 				continue;
 			}
 			if (!call_user_func($sanitise, $val)) {
+				$this->_log(LOG_WARNING, __CLASS__ . '::' . __FUNCTION__ . '(): sanitise failure for key: ' . $key);
 				unset($extras[$key]);
 			}
 		}
@@ -150,7 +158,10 @@ class WMS_Update extends WMS {
 			}
 			if (isset($_REQUEST['upgrade']) && $_REQUEST['upgrade'] == '1') {
 				$syslogm['upgrade'] = 1;
-				$dblogm['last_upgrade'] = $ver;
+				$dblogm['upgradever'] = $ver;
+			}
+			if (isset($_SERVER['REMOTE_ADDR'])) {
+				$dblogm['ipaddress'] = $_SERVER['REMOTE_ADDR'];
 			}
 			// update DB
 			$this->_addDevice($dblogm);
@@ -362,7 +373,7 @@ run ctwug_gametime;
 /system scheduler add name="ctwug_update_temp" interval=5s on-event="/system script run ctwug_update";
 <?php endif; ?>
 <?php if ($virgin): ?>
-:put "Welcome to CTWUG!";
+:put "Welcome to WMS!";
 <?php endif; ?>
 <?php
 		return true;

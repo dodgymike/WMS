@@ -44,7 +44,7 @@ class WMS_Firewall extends WMS {
 			}
 			$protocol = $this->_protocols[$row['protocol']];
 			$l4rule = 'chain=pre-l4 action=jump jump-target=pre-' . $row['class'];
-			$l4rule .= ' protocol=' . $protocol;
+			$l4rule .= ' passthrough=no protocol=' . $protocol;
 			if ($row['protocol'] == 6 || $row['protocol'] == 17) {
 				// TCP/UDP must specify a port
 				if ($row['port_min'] < 1) {
@@ -65,21 +65,21 @@ class WMS_Firewall extends WMS {
 ?>
 /ip firewall mangle
 :foreach n in [find where comment~"^AUTO.*"] do={ remove $n }
-add chain=prerouting action=mark-packet new-packet-mark=BULK connection-mark=pre-bulk disabled=yes comment="AUTO bulk"
-add chain=prerouting action=mark-packet new-packet-mark=SERVICE connection-mark=pre-service disabled=yes comment="AUTO service"
-add chain=prerouting action=mark-packet new-packet-mark=GAME connection-mark=pre-game disabled=yes comment="AUTO game"
-add chain=prerouting action=mark-packet new-packet-mark=REAL connection-mark=pre-real disabled=yes comment="AUTO real"
-add chain=pre-bulk action=mark-connection new-connection-mark=pre-bulk connection-mark=!pre-bulk disabled=yes comment="AUTO bulk"
-add chain=pre-bulk action=mark-packet new-packet-mark=BULK connection-mark=pre-bulk disabled=yes comment="AUTO bulk"
-add chain=pre-service action=mark-connection new-connection-mark=pre-service connection-mark=!pre-service disabled=yes comment="AUTO service"
-add chain=pre-service action=mark-packet new-packet-mark=SERVICE connection-mark=pre-service disabled=yes comment="AUTO service"
-add chain=pre-game action=mark-connection new-connection-mark=pre-game connection-mark=!pre-game disabled=yes comment="AUTO game"
-add chain=pre-game action=mark-packet new-packet-mark=GAME connection-mark=pre-game disabled=yes comment="AUTO game"
-add chain=pre-real action=mark-connection new-connection-mark=pre-real connection-mark=!pre-real disabled=yes comment="AUTO real"
-add chain=pre-real action=mark-packet new-packet-mark=REAL connection-mark=pre-real disabled=yes comment="AUTO real"
-add chain=prerouting action=jump jump-target=pre-l4 disabled=yes comment="AUTO prerouting"
-add chain=output action=jump jump-target=pre-l4 disabled=yes comment="AUTO output"
-add chain=input action=jump jump-target=pre-l4 disabled=yes comment="AUTO input"
+add chain=prerouting action=mark-packet new-packet-mark=BULK passthrough=no connection-mark=pre-bulk disabled=yes comment="AUTO bulk"
+add chain=prerouting action=mark-packet new-packet-mark=SERVICE passthrough=no connection-mark=pre-service disabled=yes comment="AUTO service"
+add chain=prerouting action=mark-packet new-packet-mark=GAME passthrough=no connection-mark=pre-game disabled=yes comment="AUTO game"
+add chain=prerouting action=mark-packet new-packet-mark=REAL passthrough=no connection-mark=pre-real disabled=yes comment="AUTO real"
+add chain=pre-bulk action=mark-connection new-connection-mark=pre-bulk passthrough=yes connection-mark=!pre-bulk disabled=yes comment="AUTO bulk"
+add chain=pre-bulk action=mark-packet new-packet-mark=BULK passthrough=no connection-mark=pre-bulk disabled=yes comment="AUTO bulk"
+add chain=pre-service action=mark-connection new-connection-mark=pre-service passthrough=yes connection-mark=!pre-service disabled=yes comment="AUTO service"
+add chain=pre-service action=mark-packet new-packet-mark=SERVICE passthrough=no connection-mark=pre-service disabled=yes comment="AUTO service"
+add chain=pre-game action=mark-connection new-connection-mark=pre-game passthrough=yes connection-mark=!pre-game disabled=yes comment="AUTO game"
+add chain=pre-game action=mark-packet new-packet-mark=GAME passthrough=no connection-mark=pre-game disabled=yes comment="AUTO game"
+add chain=pre-real action=mark-connection new-connection-mark=pre-real passthrough=yes connection-mark=!pre-real disabled=yes comment="AUTO real"
+add chain=pre-real action=mark-packet new-packet-mark=REAL passthrough=no connection-mark=pre-real disabled=yes comment="AUTO real"
+add chain=prerouting action=jump jump-target=pre-l4 passthrough=no disabled=yes comment="AUTO prerouting"
+add chain=output action=jump jump-target=pre-l4 passthrough=no disabled=yes comment="AUTO output"
+add chain=input action=jump jump-target=pre-l4 passthrough=no disabled=yes comment="AUTO input"
 <?php
 		foreach ($l4rules as $l4rule) {
 			echo 'add ' . $l4rule . "\n";

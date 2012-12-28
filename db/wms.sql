@@ -28,7 +28,7 @@ CREATE TABLE `game_time_schedule` (
   `hour` int(11) NOT NULL,
   `active` tinyint(1) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=44 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=62 DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -45,12 +45,14 @@ CREATE TABLE `device` (
   `model` varchar(32) DEFAULT NULL,
   `name` varchar(32) DEFAULT NULL,
   `os` varchar(64) DEFAULT NULL,
+  `ipaddress` varchar(40) DEFAULT NULL,
   `updatever` int(10) unsigned DEFAULT NULL,
+  `upgradever` int(10) unsigned DEFAULT NULL,
   `contact` varchar(64) DEFAULT NULL,
   `last_checkin` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `serial` (`serial`)
-) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB AUTO_INCREMENT=365 DEFAULT CHARSET=latin1;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -63,13 +65,13 @@ DROP TABLE IF EXISTS `qos_classify`;
 CREATE TABLE `qos_classify` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `sort` smallint(5) unsigned NOT NULL DEFAULT '4',
-  `protocol` tinyint(3) unsigned DEFAULT NULL,
-  `port_min` smallint(5) unsigned DEFAULT NULL,
-  `port_max` smallint(5) unsigned DEFAULT NULL,
+  `protocol` smallint(5) unsigned NOT NULL DEFAULT '0',
+  `port_min` smallint(5) unsigned NOT NULL DEFAULT '0',
+  `port_max` smallint(5) unsigned NOT NULL DEFAULT '0',
   `class` varchar(8) DEFAULT NULL,
   `comment` varchar(64) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=49 DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB AUTO_INCREMENT=51 DEFAULT CHARSET=latin1;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
@@ -81,4 +83,4 @@ CREATE TABLE `qos_classify` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2012-12-17  0:39:56
+-- Dump completed on 2012-12-29  1:02:12
