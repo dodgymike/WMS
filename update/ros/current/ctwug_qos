@@ -1,10 +1,15 @@
 :local rosver [:pick [/system resource get version] 0]
+:local qdisabled yes
 
 /queue simple
 :foreach n in [find where comment~"^AUTO.*"] do={
+  :if (![get $n disabled]) do={
+    :set qdisabled no
+  }
   :log info ("ctwug_qos: removing simple queue " . [get $n name])
   remove $n
 }
+
 
 /interface
 :local i 0
@@ -25,4 +30,9 @@
   }
   $qAdd
   :log info ("ctwug_qos: adding simple queue " . $name . " for interface " . $iface)
+}
+
+/queue simple
+:foreach n in [find where name~"^ctwug_" && disabled!=$qdisabled] do={
+  set $n disabled=$qdisabled
 }

@@ -1,39 +1,28 @@
 <?php
-/*
- * gametime.php
- * this forms part of the CTWUG NOC
- *
- * rb's will call as below and info will be persisted into a database
- *
- * Mike Davis
- * 2012/11/22
+$wdaymap = array('sun','mon','tue','wed','thu','fri','sat');
+$now = localtime((time()), true);
+$wday  = $wdaymap[$now['tm_wday']];
+$hour  = $now['tm_hour'];
 
-//sample api call
-http://noc.ctwug.za.net/web/api/gametime
-
- */
-require_once($_SERVER['WMS_PATH'] . '/config.php');
-// date 
-$today = getdate();
-
-$wday  = $today['wday'];
-$hour  = $today['hours'];
-
-// gametime
-$gametime = 0;
-
-//setup pdo mysql connection
-$db = new PDO("mysql:host=$DBHOST;dbname=$DBNAME", $DBUSER,$DBPASS);
-
-//check if there is an entry for the existing routerboard serialnumber
-$stmt = $db->prepare("select id, dow, hour, active from game_time_schedule where dow = ? and hour = ?");
-$stmt->execute(array($wday, $hour));
-if ($stmt->rowCount() >0) {
-    $rows = $stmt->fetchAll(PDO::FETCH_CLASS);
-    $gametime = $rows[0]->active;
+if ($hour < 10) {
+	$hour = '0' . $hour;
 }
 
+if (isset($_REQUEST['on']) && $_REQUEST['on'] == '1') {
+	$httpcode = array('on'=>404, 'off'=>200);
+} else {
+	$httpcode = array('on'=>200, 'off'=>404);
+}
+
+$path = $_SERVER['WMS_PATH'] . '/gametime/' . $wday . '/' . $hour;
+
+if (file_exists($path)) {
+	$msg = 'Gametime is ON';
+	header('HTTP/1.0 ' . $httpcode['on'] . ' ' . $msg);
+} else {
+	$msg = 'Gametime is OFF';
+	header('HTTP/1.0 ' . $httpcode['off'] . ' ' . $msg);
+}
 header('Content-Type: text/plain');
-header('Content-Length: 1');
-// is it gametime?
-echo $gametime;
+header('Content-Length: ' . strlen($msg));
+echo $msg;

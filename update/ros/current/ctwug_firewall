@@ -14,6 +14,14 @@
 }
 
 if ($found = 1) do={
+#  Is gametime active?
+  :local fdisabled yes
+  /queue simple
+  :foreach n in [find where name~"^ctwug_"] do={
+    :if (![get $n disabled]) do={
+      :set fdisabled no
+    }
+  }
 #   Disable some logging... prevents ALOT of noise from being logged
   /system logging
   :foreach log in [find] do={
@@ -22,6 +30,10 @@ if ($found = 1) do={
     }
   }
   /import $ffile
+  /ip firewall mangle
+  :foreach n in [find where comment~"^AUTO.*" && disabled!=$fdisabled] do={
+    set $n disabled=$fdisabled
+  }
 #   Re-enable logging
   /system logging
   :foreach log in [find] do={

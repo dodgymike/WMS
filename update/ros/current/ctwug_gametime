@@ -1,38 +1,59 @@
-/tool fetch address=wms.ctwug.za.net host=wms.ctwug.za.net src-path=api/gametime dst-path=is_gametime.txt mode=http
-:delay 1
-:local temp [/file get is_gametime.txt contents]
-:local fdisabled no
-:if ($temp = 0) do={:set fdisabled yes} 
+:local serial [/system routerboard get serial-number]
+:local qos 0
+:local gtdisabled yes
+
+# This gets created after an upgrade to do a one-shot gametime check
+/system scheduler
+:foreach n in [find where name="ctwug_gametime_temp"] do={
+  :log info ("ctwug_gametime: removing scheduler " . [get $n name])
+  remove $n
+}
 
 /queue simple
-:local qos
-:foreach qos in [find disabled!=$fdisabled] do={
- :if ( [:pick [get $qos comment] 0 4] = "AUTO" ) do=[set $qos disabled=$fdisabled]
-}
-
-/interface
-:local iface
-:foreach iface in [find disabled=no] do={
- :if ( [:pick [get $iface comment] 0 4] = "qos;" ) do=[ :set fdisabled no]
-}
-
-# Disable some logging... prevents ALOT of noise from being logged
-/system logging
-:foreach log in [find] do={
-  :foreach topic in [get $log topics] do={
-    :if ($topic = "info" || $topic = "system") do={ disable $log }
-  }
-}
-/ip firewall mangle
-:local fw
-:foreach fw in [find disabled!=$fdisabled] do={
- :if ( [:pick [get $fw comment] 0 4] = "AUTO" ) do=[set $fw disabled=$fdisabled]
-}
-# Re-enable logging
-/system logging
-:foreach log in [find] do={
-  :foreach topic in [get $log topics] do={
-    :if ($topic = "info" || $topic = "system") do={ enable $log }
+:foreach n in [find where name~"^ctwug_"] do={
+  :set qos 1
+  :if (![get $n disabled]) do={
+    :set gtdisabled no
   }
 }
 
+:if ($qos = 1) do={
+  :local srcpath ("api/gametime?serial=".$serial)
+  :if (!$gtdisabled) do={
+    :set srcpath ($srcpath."&on=1")
+  }
+#  If this returns 404, the script aborts
+  /tool fetch address=wms.ctwug.za.net host=wms.ctwug.za.net src-path=$srcpath mode=http keep-result=no
+
+#  Successful fetch means toggle current status
+  :if ($gtdisabled) do={
+    :log info "ctwug_gametime: setting gametime ON"
+    :set gtdisabled no
+  } else={
+    :log info "ctwug_gametime: setting gametime OFF"
+    :set gtdisabled yes
+  }
+
+#   Disable some logging... prevents ALOT of noise from being logged
+  /system logging
+  :foreach log in [find] do={
+    :foreach topic in [get $log topics] do={
+      :if ($topic = "info" || $topic = "system") do={ disable $log }
+    }
+  }
+  /queue simple
+  :foreach n in [find where name~"^ctwug_" && disabled!=$gtdisabled] do={
+    set $n disabled=$gtdisabled
+  }
+  /ip firewall mangle
+  :foreach n in [find where comment~"^AUTO" && disabled!=$gtdisabled] do={
+    set $n disabled=$gtdisabled
+  }
+#   Re-enable logging
+  /system logging
+  :foreach log in [find] do={
+    :foreach topic in [get $log topics] do={
+      :if ($topic = "info" || $topic = "system") do={ enable $log }
+    }
+  }
+}

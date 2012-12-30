@@ -1,7 +1,7 @@
 <?php
-require_once($_SERVER['WMS_PATH'] . '/wms.php');
+require_once($_SERVER['WMS_PATH'] . '/api.php');
 
-class WMS_Update extends WMS {
+class WMS_Update extends WMS_API {
 	private $_version;
 	private $_add;
 	private $_remove;
@@ -61,7 +61,7 @@ class WMS_Update extends WMS {
 			}
 		}
 		// Check if serial number already exists
-		$db = $this->_dbConnect();
+		$db = $this->_getDb();
 		$st = $db->prepare('SELECT id FROM device WHERE serial=:serial');
 		if (!$st->execute(array(':serial' => $this->_serial))) {
 			return;
@@ -82,7 +82,7 @@ class WMS_Update extends WMS {
 				$sql .= $key . '=:' . $key . ', ';
 				$params[':'.$key] = $val;
 			}
-			$sql .= 'last_checkin=NOW() WHERE id=:id';
+			$sql .= 'lastseen=NOW() WHERE id=:id';
 		} else {
 			// Table INSERTs
 			$params = array(':serial' => $this->_serial, ':platform' => $this->getPlatform());
@@ -368,7 +368,7 @@ run ctwug_firewall;
 <?php if ($virgin): ?>
 :put "Running script ctwug_gametime";
 <?php endif; ?>
-run ctwug_gametime;
+/system scheduler add name="ctwug_gametime_temp" interval=10s on-event="/system script run ctwug_gametime";
 <?php if ($docallback): ?>
 /system scheduler add name="ctwug_update_temp" interval=5s on-event="/system script run ctwug_update";
 <?php endif; ?>

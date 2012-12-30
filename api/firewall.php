@@ -1,7 +1,7 @@
 <?php
-require_once($_SERVER['WMS_PATH'] . '/wms.php');
+require_once($_SERVER['WMS_PATH'] . '/api.php');
 
-class WMS_Firewall extends WMS {
+class WMS_Firewall extends WMS_API {
 	private $_protocols;
 
 	public function __construct () {
@@ -25,7 +25,7 @@ class WMS_Firewall extends WMS {
 
 	protected function _firewall_ros () {
 		$l4rules = array();
-		$db = $this->_dbConnect();
+		$db = $this->_getDb();
 		$sql = 'SELECT protocol, port_min, port_max, class, comment FROM qos_classify ORDER BY sort ASC';
 		if (false === ($st = $db->prepare($sql))) {
 			return false;
