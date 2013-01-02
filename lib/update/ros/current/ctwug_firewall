@@ -1,6 +1,10 @@
-:local serial [/system routerboard get serial-number]
+:local softid [/system license get software-id]
+:local apipath ("api/firewall?softid=".$softid)
+:if ([/system routerboard get routerboard]) do={
+  :local serial [/system routerboard get serial-number]
+  :set apipath ($apipath."&serial=".$serial)
+}
 :local ffile "ctwug_firewall.rsc"
-:local apipath ("api/firewall?serial=".$serial)
 :local found 0
 :local cnt 0
 /tool fetch host=wms.ctwug.za.net address=wms.ctwug.za.net src-path=$apipath dst-path=$ffile mode=http

@@ -1,4 +1,7 @@
-:local serial [/system routerboard get serial-number] 
+:local bname [/system license get software-id]
+:if ([/system routerboard get routerboard]) do={
+  :set bname [/system routerboard get serial-number]
+}
 
 :if ( [/file find name=ctwug-auto.backup] != "" ) do=[/file remove ctwug-auto.backup]
 :delay 1
@@ -18,7 +21,7 @@
   }
 }
 :if ([/file find name=ctwug-auto.backup] != "") do={
-  /tool fetch mode=ftp upload=yes address=wms.ctwug.za.net src-path="ctwug-auto.backup" dst-path="upload/$serial.backup"
+  /tool fetch mode=ftp upload=yes address=wms.ctwug.za.net src-path="ctwug-auto.backup" dst-path="upload/$bname.backup"
   /file remove ctwug-auto.backup
   :log info "ctwug_backup: uploaded backup"
 }

@@ -6,8 +6,12 @@ class WMS_Firewall extends WMS_API {
 
 	public function __construct () {
 		parent::__construct();
-		$this->_logmodule = 'firewall';
-		$this->_next = array($this, '_firewall_' . $this->getPlatform());
+		$pf = $this->getPlatform();
+		if (!$pf) {
+			$this->bail('Unsupported platform');
+			return;
+		}
+		$this->_next = array($this, '_firewall_' . $pf);
 		$this->_protocols[1] = 'icmp';
 		$this->_protocols[2] = 'igmp';
 		$this->_protocols[6] = 'tcp';

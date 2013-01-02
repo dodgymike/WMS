@@ -1,5 +1,3 @@
-:local rosver [:pick [/system resource get version] 0]
-
 # Make sure 172.18.1.1 is the first DNS server in /ip dns
 :local found 0
 /ip dns
@@ -26,7 +24,7 @@
   :log info "ctwug_global_settings: setting time zone to Africa/Johannesburg"
   set time-zone-name=Africa/Johannesburg
 }
-:local found 1
+:set found 1
 /system ntp client
 :if (![get enabled]) do={ :set found 0 }
 :if ([get mode] != "unicast") do={ :set found 0 }
@@ -34,6 +32,20 @@
 :if ($found = 0) do={
   :log info "ctwug_global_settings: enabling unicast NTP client"
   set enabled=yes mode=unicast primary-ntp=172.18.1.1
+}
+
+# Make sure SSH is enabled on the default port
+:set found 1
+/ip service
+:if (![get ssh disabled]) do={
+  :set found 0
+}
+:if ([get ssh port] != 22) do={
+  :set found 0
+}
+:if ($found = 0) do={
+  :log info "ctwug_global_settings: enabling SSH on port 22"
+  set ssh port=22 disabled=no
 }
 
 # Essential schedules to keep everything working!
@@ -52,17 +64,6 @@
 :if (![get enabled]) do={
   :log info "ctwug_global_settings: enabling SNMP"
   set enabled=yes
-}
-/ip firewall connection tracking
-:local test
-:if ($rosver = "6") do={
-  :set test "auto"
-} else={
-  :set test yes
-}
-:if ([get enabled] != $test) do={
-  :log info "ctwug_global_settings: enabling firewall's connection tracking"
-  set enabled=$test
 }
 /ip traffic-flow
 :if ([get enabled] = "yes") do={

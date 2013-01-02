@@ -1,0 +1,103 @@
+:local softid [/system license get software-id]
+:local name [/system identity get name]
+:local rosver [/system resource get version]
+:local cpu [/system resource get cpu]
+:local cpufreq [/system resource get cpu-frequency]
+:local arch [/system resource get architecture-name]
+:local ct [/ip firewall connection tracking get enabled]
+:local contact [/snmp get contact]
+:local routerid 0.0.0.0
+:local ver %ver%
+:local upgrade 0
+:local rscript "ctwug_update.rsc"
+
+/file
+:foreach n in [find where name~"^ctwug_.*\\.rsc"] do={
+  :log info ("ctwug_update: removing file " . [get $n name])
+  remove $n
+}
+
+# This scheduler gets created at the end of an upgrade, to signal a successful upgrade
+/system scheduler
+:foreach n in [find where name="ctwug_update_temp"] do={
+  :set upgrade 1
+  :log info ("ctwug_update: removing scheduler " . [get $n name])
+  remove $n
+}
+
+# Build query string
+:local query ("softid=".$softid."&ver=".$ver."&rosver=".$rosver."&cpu=".$cpu."&cpufreq=".$cpufreq."&arch=".$arch."&name=".$name)
+
+# If hardware is a RouterBOARD, get extra info
+:if ([/system routerboard get routerboard]) do={
+  :local serial [/system routerboard get serial-number]
+  :local board [/system resource get board-name]
+  :local firmware [/system routerboard get current-firmware]
+  :set query ("serial=".$serial."&".$query."&board=".$board."&firmware=".$firmware)
+}
+
+# Developer override
+/system script environment
+:foreach n in [find where name="ctwugcurver"] do={
+  :local curver [get $n value]
+  :set query ($query."&curver=".$curver)
+}
+
+/ip address
+:foreach n in [find where comment~"^routerid;"] do={
+  :if ($routerid = 0.0.0.0) do={
+    :local address [get $n address]
+    :local slash [:find $address "/"]
+    :set routerid [:pick $address 0 $slash]
+  }
+}
+:if ($routerid != 0.0.0.0) do={
+  :set query ($query."&routerid=".$routerid)
+}
+
+:if ([:len $contact] > 5) do={
+  :set query ($query."&contact=".$contact)
+}
+
+# Get connection tracking status... 5.x uses bool, 6.x uses string
+:if ([:typeof $ct] = "bool") do={
+  :if ($ct) do={
+    :set query ($query."&ct=1")
+  } else={
+    :set query ($query."&ct=0")
+  }
+}
+:if ([:typeof $ct] = "str") do={
+  :if ($ct = "enabled") do={
+    :set query ($query."&ct=1")
+  }
+  :if ($ct = "disabled") do={
+    :set query ($query."&ct=0")
+  }
+  :if ($ct = "auto") do={
+    :set query ($query."&ct=2")
+  }
+}
+
+# Were we just upgraded?
+:if ($upgrade = 1) do={
+  :set query ($query."&upgrade=1")
+}
+
+# URL escape query
+:local path "api/update?"
+:local fchar
+:for i from=0 to=( [:len $query] - 1) do={
+  :set fchar [:pick $query $i]
+  :if ($fchar = " ") do={
+    :set fchar "%20"
+  }
+  :set path ($path.$fchar)
+}
+
+/tool fetch address=wms.ctwug.za.net host=wms.ctwug.za.net src-path=$path dst-path=$rscript mode=http
+:delay 3
+:local temp [/file get $rscript size]
+:if ( $temp > 2) do={
+  /import $rscript
+}

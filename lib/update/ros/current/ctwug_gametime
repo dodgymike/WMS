@@ -1,4 +1,4 @@
-:local serial [/system routerboard get serial-number]
+:local softid [/system license get software-id]
 :local qos 0
 :local gtdisabled yes
 
@@ -18,12 +18,16 @@
 }
 
 :if ($qos = 1) do={
-  :local srcpath ("api/gametime?serial=".$serial)
+  :local apipath ("api/gametime?softid=".$softid)
+  :if ([/system routerboard get routerboard]) do={
+    :local serial [/system routerboard get serial-number]
+    :set apipath ($apipath."&serial=".$serial)
+  }
   :if (!$gtdisabled) do={
-    :set srcpath ($srcpath."&on=1")
+    :set apipath ($apipath."&on=1")
   }
 #  If this returns 404, the script aborts
-  /tool fetch address=wms.ctwug.za.net host=wms.ctwug.za.net src-path=$srcpath mode=http keep-result=no
+  /tool fetch address=wms.ctwug.za.net host=wms.ctwug.za.net src-path=$apipath mode=http keep-result=no
 
 #  Successful fetch means toggle current status
   :if ($gtdisabled) do={
