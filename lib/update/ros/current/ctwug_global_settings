@@ -37,7 +37,7 @@
 # Make sure SSH is enabled on the default port
 :set found 1
 /ip service
-:if (![get ssh disabled]) do={
+:if ([get ssh disabled]) do={
   :set found 0
 }
 :if ([get ssh port] != 22) do={
