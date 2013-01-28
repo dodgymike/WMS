@@ -45,8 +45,7 @@ do
 	chgrp www ${dst}
 	chmod g+r ${dst}
 	sha1sum ${dst} >> SHA1SUMS
-	cd -
-	updates="${updates:+${updates} }${serial}"
+	cd ${UPLOADDIR}
 done
 
 cd ${BACKUPDIR}

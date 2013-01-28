@@ -219,18 +219,8 @@ class WMS_Update extends WMS_API {
     :error "Backup failed!  Aborting."
   }
 }
-:put "Ensuring connection tracking is enabled"
-:local rosver [:pick [/system resource get version] 0]
-/ip firewall connection tracking
-:local test
-:if ($rosver = "6") do={
-  :set test "auto"
-} else={
-  :set test yes
-}
-:if ([get enabled] != $test) do={
-  set enabled=$test
-}
+:put "Disabling connection tracking"
+/ip firewall connection tracking set enabled=no
 :put "Seeking and destroying old scripts"
 /system scheduler;
 :foreach n in [find name~"^ctwug_.*"] do={remove $n};
