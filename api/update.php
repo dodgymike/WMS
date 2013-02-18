@@ -6,8 +6,8 @@ class WMS_Update extends WMS_API {
 	private $_add;
 	private $_remove;
 
-	public function __construct () {
-		parent::__construct();
+	public function __construct ($wms) {
+		parent::__construct($wms);
 		$pf = $this->getPlatform();
 		if (!$pf) {
 			$this->bail('Unsupported platform');
@@ -28,55 +28,31 @@ class WMS_Update extends WMS_API {
 		}
 		$this->_version = $ver;
 		$syslogm = array('ver' => $ver);
-		$dblogm = array('updatever' => $ver);
 		// $ver > 0 means ctwug_update is executing, and we have more metrics to log
 		// syslog logs raw data
 		// db stores abstracted data
 		if ($ver > 0) {
-			if (!($this->_serial || $this->_softid)) {
-				// missing this later would be ugly
-				$this->bail('Missing serial number');
+			if (!$this->_device) {
+				$this->bail('Invalid request', 409);
 				return false;
 			}
-			foreach (array('cpu','cpufreq','arch','firmware') as $param) {
-				if (!isset($_REQUEST[$param])) {
-					continue;
+			if (!$this->_device->load()) {
+				$this->_log(LOG_NOTICE, 'adding new device');
+				$oldver = 0;
+			} else {
+				$oldver = $this->_device->updatever;
+				if (!$oldver) {
+					$oldver = 0;
 				}
-				$syslogm[$param] = $_REQUEST[$param];
 			}
-			foreach (array('name','routerid') as $param) {
-				if (!isset($_REQUEST[$param])) {
-					continue;
-				}
-				$dblogm[$param] = $syslogm[$param] = $_REQUEST[$param];
-			}
-			if (isset($_REQUEST['rosver'])) {
-				$dblogm['os'] = $syslogm['rosver'] = $_REQUEST['rosver'];
-			}
-			if (isset($_REQUEST['board'])) {
-				$dblogm['model'] = $syslogm['board'] = $_REQUEST['board'];
-			}
-			if (isset($_REQUEST['contact'])) {
-				// E-mail address... or we hope so
-				$syslogm['contact'] = $_REQUEST['contact'];
-				$dbcontact = trim($_REQUEST['contact']);
-				if (preg_match('/^[A-Z0-9._%-]+@(?:[A-Z0-9-]+\.)+[A-Z]{2,6}$/i', $dbcontact)) {
-					$dblogm['contact'] = $dbcontact;
-				}
+			if (isset($_REQUEST['name'])) {
+				$this->_device->name = $syslogm['name'] = $_REQUEST['name'];
 			}
 			if (isset($_REQUEST['upgrade']) && $_REQUEST['upgrade'] == '1') {
-				$syslogm['upgrade'] = 1;
-				$dblogm['upgradever'] = $ver;
+				$this->_log(LOG_NOTICE, 'successful upgrade ' . $oldver . '->' . $ver);
 			}
-			if (isset($_REQUEST['ct']) && is_numeric($_REQUEST['ct'])) {
-				$syslogm['ct'] = $_REQUEST['ct'];
-				$dblogm['ct'] = (int) $_REQUEST['ct'];
-			}
-			if (isset($_SERVER['REMOTE_ADDR'])) {
-				$dblogm['lastip'] = $_SERVER['REMOTE_ADDR'];
-			}
-			// update DB
-			$this->_addDevice($dblogm);
+			$this->_device->updatever = $ver;
+			$this->_device->save();
 		}
 		if (isset($_REQUEST['curver'])) {
 			$syslogm['curver'] = $_REQUEST['curver'];
@@ -341,5 +317,5 @@ run ctwug_firewall;
 	}
 }
 
-$wms = new WMS_Update();
+$wms = new WMS_Update(new WMS());
 $wms->boot();

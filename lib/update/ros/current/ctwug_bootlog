@@ -1,0 +1,12 @@
+# Wait for NTP to sync
+:local ntpt1 [:typeof [/system ntp client get last-update-from]]
+:local ntpt2 [:typeof [/system ntp client get last-adjustment]]
+:while (!($ntpt1 = "str" && $ntpt2 = "time")) do={
+  :delay 10s
+  :set ntpt1 [:typeof [/system ntp client get last-update-from]]
+  :set ntpt2 [:typeof [/system ntp client get last-adjustment]]
+}
+
+# Log twice...
+:log info "NTP synchronised after boot"
+:log info "NTP synchronised after boot"

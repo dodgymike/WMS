@@ -4,8 +4,8 @@ require_once($_SERVER['WMS_PATH'] . '/api.php');
 class WMS_Firewall extends WMS_API {
 	private $_protocols;
 
-	public function __construct () {
-		parent::__construct();
+	public function __construct ($wms) {
+		parent::__construct($wms);
 		$pf = $this->getPlatform();
 		if (!$pf) {
 			$this->bail('Unsupported platform');
@@ -29,7 +29,7 @@ class WMS_Firewall extends WMS_API {
 
 	protected function _firewall_ctracking_ros () {
 		$l4rules = array();
-		$db = $this->_getDb();
+		$db = $this->_wms->getDb();
 		$sql = 'SELECT protocol, port_min, port_max, class, comment FROM qos_classify ORDER BY sort ASC';
 		if (false === ($st = $db->prepare($sql))) {
 			return false;
@@ -93,7 +93,7 @@ add chain=input action=jump jump-target=pre-l4 passthrough=no disabled=yes comme
 
 	protected function _firewall_dscp_ros () {
 		$l4rules = array();
-		$db = $this->_getDb();
+		$db = $this->_wms->getDb();
 		$sql = 'SELECT protocol, port_min, port_max, class, comment FROM qos_classify ORDER BY sort ASC';
 		if (false === ($st = $db->prepare($sql))) {
 			$this->_log(LOG_ERR, 'DB error');
@@ -179,5 +179,5 @@ add chain=output action=jump jump-target=predscp-bulk disabled=yes comment="AUTO
 	}
 }
 
-$wms = new WMS_Firewall();
+$wms = new WMS_Firewall(new WMS());
 $wms->boot();

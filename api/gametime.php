@@ -2,13 +2,6 @@
 require_once($_SERVER['WMS_PATH'] . '/api.php');
 
 class WMS_Gametime extends WMS_API {
-	public function __construct() {
-		parent::__construct();
-		if ($this->_serial || $this->_softid) {
-			$this->_addDevice();
-		}
-	}
-
 	public function doGametime () {
 		$wdaymap = array('sun','mon','tue','wed','thu','fri','sat');
 		$now = localtime((time()), true);
@@ -44,5 +37,5 @@ class WMS_Gametime extends WMS_API {
 	}
 }
 
-$wms = new WMS_Gametime();
+$wms = new WMS_Gametime(new WMS());
 $wms->doGametime();

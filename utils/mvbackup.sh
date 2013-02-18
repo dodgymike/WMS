@@ -7,7 +7,7 @@ BACKUPDIR=/data/www/wms.ctwug.za.net/backup
 cd ${UPLOADDIR}
 pserial="0"
 now15=$(date --date="15 minutes ago" +%s)
-now3d=$(date --date="3 days ago" +%Y%m%d)
+now7d=$(date --date="7 days ago" +%Y%m%d)
 now1w=$(date --date="1 week ago" +%Y%m%d)
 now2w=$(date --date="2 weeks ago" +%Y%m%d)
 now3w=$(date --date="3 weeks ago" +%Y%m%d)
@@ -70,9 +70,9 @@ do
 			echo invalid date format: ${btime} >&2
 			continue
 		fi
-		if [ ${btime} -ge ${now3d} ]
+		if [ ${btime} -ge ${now7d} ]
 		then
-			# Keep backups 3 days old or younger
+			# Keep backups 7 days old or younger
 			continue
 		fi
 		if ${week1} && [ ${btime} -le ${now1w} -a ${btime} -gt ${now2w} ]
