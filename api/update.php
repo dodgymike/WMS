@@ -37,7 +37,7 @@ class WMS_Update extends WMS_API {
 				return false;
 			}
 			if (!$this->_device->load()) {
-				$this->_log(LOG_NOTICE, 'adding new device');
+				$this->_log(LOG_NOTICE, __FUNCTION__ . '(): adding new device');
 				$oldver = 0;
 			} else {
 				$oldver = $this->_device->updatever;

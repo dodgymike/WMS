@@ -169,11 +169,11 @@ class WMS_Discover extends WMS_API {
 				$iface['bridgename'] = $props[17];
 			}
 		}
+		$iface['addresses'] = array();
 		if ($propc > 18) {
 			if ($propc > 24) {
 				$propc = 24;
 			}
-			$iface['addresses'] = array();
 			for ($i = 18; $i < $propc; $i++) {
 				if (!preg_match('|^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/[0-9]{1,2}$|', $props[$i])) {
 					continue;
@@ -188,8 +188,19 @@ class WMS_Discover extends WMS_API {
 	protected function _discover_ros () {
 		$device = $this->_device;
 		if (!$device->load()) {
-			$this->_log(LOG_INFO, __FUNCTION__ . '(): adding new device');
+			$this->_log(LOG_NOTICE, __FUNCTION__ . '(): adding new device');
 		}
+		$device->addInterface(null);
+		$device->set('name', null);
+		$device->set('arch', null);
+		$device->set('cpu', null);
+		$device->set('cpufreq', null);
+		$device->set('board', null);
+		$device->set('model', null);
+		$device->set('bootver', null);
+		$device->set('osver', null);
+		$device->set('contact', null);
+		$device->set('ct', null);
 		foreach ($_REQUEST as $key => $val) {
 			if (substr($key, 0, 3) == 'wif') {
 				$jump = array($this, '_discover_ros_wif');

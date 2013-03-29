@@ -1,4 +1,6 @@
 <?php
+require_once($_SERVER['WMS_PATH'] . '/notify.php');
+
 class WMS_Device {
 	private $_wms;
 	private $_savedDevice;
@@ -203,10 +205,16 @@ class WMS_Device {
 			$param[':serial'] = $this->serial;
 		}
 		foreach ($this->_deviceColumns as $col) {
-			if ($this->$col) {
+			if (!is_null($this->$col)) {
 				$sqlcol .= ', ' . $col;
 				$sqlval .= ', :' . $col;
 				$param[':'.$col] = $this->$col;
+				if ($col == 'contact') {
+					$notify = new WMS_Notify('newdevice');
+					$notify->set('device', $this->$idfield);
+					$notify->set('devicename', $this->name);
+					$notify->set('address', $this->contact);
+				}
 			}
 			$savedDevice[$col] = $this->$col;
 		}
@@ -224,43 +232,21 @@ class WMS_Device {
 				. 'DB error getting device insertion ID');
 			return false;
 		}
-		$this->_savedDevice = $savedDevice;
-		return $this->_save_add_interfaces();
-	}
-
-	public function save () {
-		$db = $this->_wms->getDb();
-		$idfield = $this->_idfield;
-		if (is_null($this->_savedDevice)) {
-			$this->_load_device();
-		}
-		if (!$this->_savedDevice) {
-			$this->_save_add_device();
-			return true;
-		}
-		$devsql = '';
-		$devpar = array();
-		$savedDevice = $this->_savedDevice;
-		foreach ($this->_deviceColumns as $col) {
-			if ($this->$col != $savedDevice[$col]) {
-				$devsql .= ', ' . $col . '=:' . $col;
-				$devpar[':'.$col] = $this->$col;
-				$savedDevice[$col] = $this->$col;
+		if (isset($notify)) {
+			if (!$notify->send()) {
+				throw new Exception(__CLASS__ . '::' . __FUNCTION__ . '(): '
+					. 'error sending notification for: ' . $this->_platform . '/' . $this->$idfield);
+				return false;
 			}
 		}
-		$sql = 'UPDATE device SET lastseen=NOW()' . $devsql;
-		$sql .= ' WHERE id=:deviceid';
-		$devpar[':deviceid'] = $savedDevice['id'];
-		$st = $db->prepare($sql);
-		if (!$st->execute($devpar)) {
-			throw new Exception(__CLASS__ . '::' . __FUNCTION__ . '(): '
-				. 'DB error updating device for: ' . $this->_platform . '/' . $this->$idfield);
-			return false;
-		}
 		$this->_savedDevice = $savedDevice;
-		if (!$this->interfaces) {
-			return true;
-		}
+		return true;
+	}
+
+	private function _save_update_interfaces () {
+		$db = $this->_wms->getDb();
+		$idfield = $this->_idfield;
+		$savedDevice = $this->_savedDevice;
 		if (!isset($savedDevice['interfaces'])) {
 			if (!$this->_load_interfaces()) {
 				return false;
@@ -324,6 +310,76 @@ class WMS_Device {
 				$keys[] = $key;
 			}
 			if (!$this->_save_add_interfaces($keys)) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	private function _save_update_device () {
+		$db = $this->_wms->getDb();
+		$idfield = $this->_idfield;
+		$savedDevice = $this->_savedDevice;
+		$devsql = '';
+		$devpar = array();
+		foreach ($this->_deviceColumns as $col) {
+			if ($this->$col !== $savedDevice[$col]) {
+				if ($col == 'contact') {
+					$notify = new WMS_Notify('newcontact');
+					$notify->set('device', $this->$idfield);
+					$notify->set('devicename', $this->name);
+					if (isset($savedDevice['contact']{0})) {
+						$notify->set('oldaddress', $savedDevice['contact']);
+					}
+					if (isset($this->contact{0})) {
+						$notify->set('newaddress', $this->contact);
+					}
+				}
+				$devsql .= ', ' . $col . '=:' . $col;
+				$devpar[':'.$col] = $this->$col;
+				$savedDevice[$col] = $this->$col;
+			}
+		}
+		$sql = 'UPDATE device SET lastseen=NOW()' . $devsql;
+		$sql .= ' WHERE id=:deviceid';
+		$devpar[':deviceid'] = $savedDevice['id'];
+		$st = $db->prepare($sql);
+		if (!$st->execute($devpar)) {
+			throw new Exception(__CLASS__ . '::' . __FUNCTION__ . '(): '
+				. 'DB error updating device for: ' . $this->_platform . '/' . $this->$idfield);
+			return false;
+		}
+		if (isset($notify)) {
+			if (!$notify->send()) {
+				throw new Exception(__CLASS__ . '::' . __FUNCTION__ . '(): '
+					. 'error sending notification for: ' . $this->_platform . '/' . $this->$idfield);
+				return false;
+			}
+		}
+		$this->_savedDevice = $savedDevice;
+		return true;
+	}
+
+	public function save () {
+		$db = $this->_wms->getDb();
+		$idfield = $this->_idfield;
+		if (is_null($this->_savedDevice)) {
+			$this->_load_device();
+		}
+		if ($this->_savedDevice) {
+			if (!$this->_save_update_device()) {
+				return false;
+			}
+			if (is_array($this->interfaces)) {
+				if (!$this->_save_update_interfaces()) {
+					return false;
+				}
+			}
+		} else {
+			if (!$this->_save_add_device()) {
+				return false;
+			}
+			if (!$this->_save_add_interfaces()) {
 				return false;
 			}
 		}
@@ -444,17 +500,30 @@ class WMS_Device {
 		if (!is_callable($jump)) {
 			return false;
 		}
+		if ($val === null) {
+			$this->$prop = null;
+			return true;
+		}
 		if (!call_user_func($jump, $val)) {
 			return false;
 		}
 		return true;
 	}
 
+	public function reset () {
+		foreach ($this->_deviceColumns as $col) {
+			$this->$col = null;
+		}
+		$this->interfaces = null;
+	}
+
 	public function addInterface ($interface) {
 		if (!$this->interfaces) {
 			$this->interfaces = array();
 		}
-		$this->interfaces[] = $interface;
+		if (is_array($interface)) {
+			$this->interfaces[] = $interface;
+		}
 	}
 
 	private function _pxlen2netmask ($pxlen) {
