@@ -11,7 +11,7 @@ class WMS_Firewall extends WMS_API {
 			$this->bail('Unsupported platform');
 			return;
 		}
-		$this->_next = array($this, '_firewall_dscp_' . $pf);
+		$this->_next = array($this, '_firewall_dscpnew_' . $pf);
 		$this->_protocols[1] = 'icmp';
 		$this->_protocols[2] = 'igmp';
 		$this->_protocols[6] = 'tcp';
@@ -172,6 +172,129 @@ add chain=output action=jump jump-target=predscp-service protocol=udp port=161 d
 add chain=output action=jump jump-target=predscp-service protocol=udp port=123 disabled=yes comment="AUTO NTP"
 add chain=output action=jump jump-target=predscp-real protocol=udp port=1234-1239 disabled=yes comment="AUTO Netflow"
 add chain=output action=jump jump-target=predscp-service protocol=tcp port=1723 disabled=yes comment="AUTO PPTP Control"
+add chain=output action=jump jump-target=predscp-service protocol=gre disabled=yes comment="AUTO PPTP"
+add chain=output action=jump jump-target=predscp-bulk disabled=yes comment="AUTO output"
+<?php
+		return true;
+	}
+
+	protected function _firewall_dscpnew_ros () {
+		$l4rules = array();
+		$db = $this->_wms->getDb();
+		$sql = 'SELECT protocol, port_min, port_max, class, comment';
+		$sql .= ' FROM qos_classify ORDER BY sort, protocol, class ASC';
+		if (false === ($st = $db->prepare($sql))) {
+			$this->_log(LOG_ERR, 'DB error');
+			return false;
+		}
+		if (!$st->execute()) {
+			$this->_log(LOG_ERR, 'DB query error');
+			return false;
+		}
+		$prev = array('protocol'=>0,'class'=>'');
+		$ccount = 0;
+		while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
+			if (!in_array($row['class'], array('bulk','service','game','real'))) {
+				// invalid class name
+				continue;
+			}
+			if (!isset($this->_protocols[$row['protocol']])) {
+				// unknown protocol
+				$this->_log(LOG_WARNING, 'Unknown protocol: ' . $row['protocol']);
+				continue;
+			}
+			if (in_array($row['protocol'], array(6, 17), false)) {
+				// TCP/UDP must specify a port
+				if ($row['port_min'] < 1) {
+					continue;
+				}
+				if ($row['protocol'] == $prev['protocol']
+				&& $row['class'] == $prev['class']) {
+					$l4type = 2;
+				} else {
+					$l4type = 1;
+				}
+			} else {
+				$l4type = 0;
+			}
+			$protocol = $this->_protocols[$row['protocol']];
+			if ($l4type != 2) {
+				// No continuation from previous entry,
+				// add l4rule to l4rules, reset l4rule.
+				if (isset($l4rule{0})) {
+					$l4rules[] = $l4rule . ' disabled=yes comment="' . $comment . '"';
+				}
+				$ccount = 0;
+				$l4rule = 'chain=preclassify action=jump jump-target=predscp-' . $row['class'];
+				$l4rule .= ' protocol=' . $protocol;
+				$comment = 'AUTO ';
+			}
+			if ($l4type) {
+				if ($row['port_max'] > $row['port_min']) {
+					$port = $row['port_min'] . '-' . $row['port_max'];
+					$ccount += 2;
+				} else {
+					$port = $row['port_min'];
+					$ccount++;
+				}
+				if ($l4type == 2) {
+					$l4rule .= ',' . $port;
+					$comment .= ', ' . $row['comment'];
+					if ($ccount >= 14) {
+						// ROS only permits 15 port entries per rule
+						$prev = array('protocol'=>0,'class'=>'');
+					}
+					continue;
+				} else {
+					$l4rule .= ' port=' . $port;
+					$comment .= $row['comment'];
+				}
+			} else {
+				$comment .= $row['comment'];
+			}
+			$prev = array('protocol'=>$row['protocol'],'class'=>$row['class']);
+		}
+		if (isset($l4rule{0})) {
+			$l4rules[] = $l4rule . ' disabled=yes comment="' . $comment . '"';
+		}
+		if (sizeof($l4rules) < 1 ) {
+			return false;
+		}
+		$l4rules[] = 'chain=preclassify action=jump jump-target=predscp-bulk disabled=yes comment="AUTO catchall"';
+?>
+/ip firewall mangle
+:foreach n in [find where comment~"^AUTO.*"] do={ remove $n }
+add chain=premark-bulk action=set-priority new-priority=1 passthrough=yes disabled=yes comment="AUTO bulk mark"
+add chain=premark-bulk action=mark-packet new-packet-mark=BULK passthrough=no disabled=yes comment="AUTO bulk mark"
+add chain=premark-service action=set-priority new-priority=3 passthrough=yes disabled=yes comment="AUTO service mark"
+add chain=premark-service action=mark-packet new-packet-mark=SERVICE passthrough=no disabled=yes comment="AUTO service mark"
+add chain=premark-game action=set-priority new-priority=5 passthrough=yes disabled=yes comment="AUTO game mark"
+add chain=premark-game action=mark-packet new-packet-mark=GAME passthrough=no disabled=yes comment="AUTO game mark"
+add chain=premark-real action=set-priority new-priority=7 passthrough=yes disabled=yes comment="AUTO real mark"
+add chain=premark-real action=mark-packet new-packet-mark=REAL passthrough=no disabled=yes comment="AUTO real mark"
+add chain=predscp-bulk action=change-dscp new-dscp=2 passthrough=yes disabled=yes comment="AUTO bulk dscp"
+add chain=predscp-bulk action=jump jump-target=premark-bulk disabled=yes comment="AUTO bulk dscp"
+add chain=predscp-service action=change-dscp new-dscp=8 passthrough=yes disabled=yes comment="AUTO service dscp"
+add chain=predscp-service action=jump jump-target=premark-service disabled=yes comment="AUTO service dscp"
+add chain=predscp-game action=change-dscp new-dscp=32 passthrough=yes disabled=yes comment="AUTO game dscp"
+add chain=predscp-game action=jump jump-target=premark-game disabled=yes comment="AUTO game dscp"
+add chain=predscp-real action=change-dscp new-dscp=48 passthrough=yes disabled=yes comment="AUTO real dscp"
+add chain=predscp-real action=jump jump-target=premark-real disabled=yes comment="AUTO real dscp" 
+<?php
+		foreach ($l4rules as $l4rule) {
+			echo 'add ' . $l4rule . "\n";
+		}
+?>
+add chain=prerouting action=jump jump-target=premark-bulk dscp=2 disabled=yes comment="AUTO bulk DSCP"
+add chain=prerouting action=jump jump-target=premark-service dscp=8 disabled=yes comment="AUTO service DSCP"
+add chain=prerouting action=jump jump-target=premark-game dscp=32 disabled=yes comment="AUTO game DSCP"
+add chain=prerouting action=jump jump-target=premark-real dscp=48 disabled=yes comment="AUTO real DSCP"
+add chain=prerouting action=jump jump-target=preclassify disabled=yes comment="AUTO prerouting"
+add chain=output action=jump jump-target=premark-real protocol=ospf disabled=yes comment="AUTO OSPF"
+add chain=output action=jump jump-target=predscp-service protocol=icmp disabled=yes comment="AUTO ICMP"
+add chain=output action=jump jump-target=predscp-service protocol=tcp port=22-23,80,1723,8291 disabled=yes comment="AUTO SSH, Telnet, HTTP, PPTP Control, Winbox"
+add chain=output action=jump jump-target=predscp-service protocol=udp port=123,161,1812-1814 disabled=yes comment="AUTO NTP, SNMP, Radius"
+add chain=output action=jump jump-target=predscp-real protocol=udp port=514,1234-1239 disabled=yes comment="AUTO Syslog, Netflow"
 add chain=output action=jump jump-target=predscp-service protocol=gre disabled=yes comment="AUTO PPTP"
 add chain=output action=jump jump-target=predscp-bulk disabled=yes comment="AUTO output"
 <?php
