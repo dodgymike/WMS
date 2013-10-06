@@ -249,11 +249,12 @@ run <?php echo $file; ?>;
 <?php
 			endif;
 		endif;
-// always run ctwug_firewall and ctwug_gametime when we send an update
+// always run ctwug_global_settings and ctwug_firewall when we send an update
 ?>
 <?php if ($virgin): ?>
 :put "Running script ctwug_firewall";
 <?php endif; ?>
+run ctwug_global_settings;
 run ctwug_firewall;
 <?php if ($virgin): ?>
 :put "Running script ctwug_gametime";
