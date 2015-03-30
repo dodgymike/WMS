@@ -1,0 +1,139 @@
+:local softid [/system license get software-id]
+:local name [/system identity get name]
+:local rosver [/system resource get version]
+:local cpu [/system resource get cpu]
+:local cpufreq [/system resource get cpu-frequency]
+:local arch [/system resource get architecture-name]
+:local ct [/ip firewall connection tracking get enabled]
+:local contact [/snmp get contact]
+:local rscript "ctwug_info.rsc"
+
+# Build query string
+:local query ("softid=".$softid."&rosver=".$rosver."&cpu=".$cpu."&cpufreq=".$cpufreq."&arch=".$arch."&name=".$name)
+
+# If hardware is a RouterBOARD, get extra info
+:if ([/system routerboard get routerboard]) do={
+  :local serial [/system routerboard get serial-number]
+  :local board [/system resource get board-name]
+  :local firmware [/system routerboard get current-firmware]
+  :set query ("serial=".$serial."&".$query."&board=".$board."&firmware=".$firmware)
+}
+
+# Get OSPF router ID
+/routing ospf instance
+:local routerid 0.0.0.0
+:foreach n in=[find where default && state="running"] do={
+  :set routerid [get $n effective-router-id]
+}
+:if ($routerid != 0.0.0.0) do={
+  :set query ($query."&routerid=".$routerid)
+}
+
+# Get SNMP contact
+:if ([:len $contact] > 5) do={
+  :set query ($query."&contact=".$contact)
+}
+
+# Get connection tracking status... 5.x uses bool, 6.x uses string
+:if ([:typeof $ct] = "bool") do={
+  :if ($ct) do={
+    :set query ($query."&ct=1")
+  } else={
+    :set query ($query."&ct=0")
+  }
+}
+:if ([:typeof $ct] = "str") do={
+  :if ($ct = "yes") do={
+    :set query ($query."&ct=1")
+  }
+  :if ($ct = "no") do={
+    :set query ($query."&ct=0")
+  }
+  :if ($ct = "auto") do={
+    :set query ($query."&ct=2")
+  }
+}
+
+# Discover wireless interfaces
+/interface
+:local wifq ""
+:local wifc 0
+:foreach n in=[find where type="wlan" && running] do={
+  :local wifn [get $n name]
+  :local mode [wireless get $wifn mode]
+  :local rname [wireless get $wifn radio-name]
+  :local ssid [wireless get $wifn ssid]
+  :local retries [wireless get $wifn hw-retries]
+  :local rselect [wireless get $wifn rate-selection]
+  :set wifq ($wifq."&wif".$wifc."=".$wifn.";".$mode.";".$rname.";".$ssid.";".$retries.";".$rselect)
+  :local mfreq
+  :local mband
+  :local mproto
+  :local mdistance
+  wireless monitor $wifn once do={
+    :set mfreq $frequency
+    :set mband $band
+    :set mproto $"wireless-protocol"
+    :if ($mproto = "802.11" || $mproto = "nv2") do={
+      :if ($status = "connected-to-ess") do={
+        :set mdistance $"current-distance"
+      }
+      :if ($status = "running-ap" && $"registered-clients" = 1) do={
+        :set mdistance [wireless registration-table get 0 distance]
+      }
+    }
+  }
+  :set wifq ($wifq.";".$mband.";".$mfreq.";".$mproto.";".$mdistance)
+  :local ampdupri
+  :if ($mband = "5ghz-n") do={
+    :set ampdupri [:tostr [wireless get $wifn ht-ampdu-priorities]]
+  }
+  :local nv2qos
+  :local nv2qc
+  :local tdmaperiod
+  :if ($mproto = "nv2") do={
+    :set nv2qos [wireless get $wifn nv2-qos]
+    :set nv2qc [wireless get $wifn nv2-queue-count]
+    :set tdmaperiod [wireless get $wifn tdma-period-size]
+  }
+  :local queue [/queue interface get $wifn queue]
+  :if ($queue = "(unknown)") do={
+    :set queue [/queue type get [/queue interface get $wifn default-queue] kind]
+  } else={
+    :set queue [/queue type get $queue kind]
+  }
+  :set wifq ($wifq.";".$ampdupri.";".$nv2qos.";".$nv2qc.";".$tdmaperiod.";".$queue)
+  :local ospft
+  :local ospfc
+  :foreach n in=[/routing ospf interface find where interface=$wifn && !disabled && !inactive] do={
+    :set ospft [/routing ospf interface get $n network-type]
+    :set ospfc [/routing ospf interface get $n cost]
+  }
+  :local bridgeifn
+  :foreach n in=[/interface bridge port find where interface=$wifn && !disabled && !inactive] do={
+    :set bridgeifn [/interface bridge port get $n bridge]
+  }
+  :set wifq ($wifq.";".$ospft.";".$ospfc.";".$bridgeifn)
+  :local wifaddr
+  :foreach n in=[/ip address find where interface=$wifn && !disabled && !invalid] do={
+    :set wifaddr [/ip address get $n address]
+    :set wifq ($wifq.";".$wifaddr)
+  }
+  :set wifc ($wifc+1)
+}
+:if ([:len $wifq] > 0) do={
+  :set query ($query.$wifq)
+}
+
+# URL escape query
+:local path "api/discover?"
+:local fchar
+:for i from=0 to=( [:len $query] - 1) do={
+  :set fchar [:pick $query $i]
+  :if ($fchar = " ") do={
+    :set fchar "%20"
+  }
+  :set path ($path.$fchar)
+}
+
+/tool fetch address=wms.ctwug.za.net host=wms.ctwug.za.net src-path=$path dst-path=$rscript mode=http keep-result=no

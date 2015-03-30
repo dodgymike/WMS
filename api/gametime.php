@@ -1,38 +1,41 @@
 <?php
-/*
- * gametime.php
- * this forms part of the CTWUG NOC
- *
- * rb's will call as below and info will be persisted into a database
- *
- * Mike Davis
- * 2012/11/22
+require_once($_SERVER['WMS_PATH'] . '/api.php');
 
-//sample api call
-http://noc.ctwug.za.net/web/api/gametime
+class WMS_Gametime extends WMS_API {
+	public function doGametime () {
+		$wdaymap = array('sun','mon','tue','wed','thu','fri','sat');
+		$now = localtime((time()), true);
+		$wday  = $wdaymap[$now['tm_wday']];
+		$hour  = $now['tm_hour'];
 
- */
-include_once('config.php');
-header('Content-Type: text/plain');
-// date 
-$today = getdate();
+		if ($hour < 10) {
+			$hour = '0' . $hour;
+		}
 
-$wday  = $today['wday'];
-$hour  = $today['hours'];
+		$rbgton = false;
+		if (isset($_REQUEST['on']) && $_REQUEST['on'] == '1') {
+			$rbgton = true;
+		}
 
-// gametime
-$gametime = 0;
+		$path = $_SERVER['WMS_PATH'] . '/gametime/' . $wday . '/' . $hour;
 
-//setup pdo mysql connection
-$db = new PDO("mysql:host=$DBHOST;dbname=$DBNAME", $DBUSER,$DBPASS);
-
-//check if there is an entry for the existing routerboard serialnumber
-$stmt = $db->prepare("select id, dow, hour, active from game_time_schedule where dow = ? and hour = ?");
-$stmt->execute(array($wday, $hour));
-if ($stmt->rowCount() >0) {
-    $rows = $stmt->fetchAll(PDO::FETCH_CLASS);
-    $gametime = $rows[0]->active;
+		if (file_exists($path)) {
+			$msg = 'Gametime is ON';
+			if ($rbgton) {
+				$this->bail($msg);
+				return;
+			}
+		} else {
+			$msg = 'Gametime is OFF';
+			if (!$rbgton) {
+				$this->bail($msg);
+				return;
+			}
+		}
+		header('Content-Length: ' . (strlen($msg)+1));
+		echo $msg . "\n";
+	}
 }
 
-// is it gametime?
-echo $gametime;
+$wms = new WMS_Gametime(new WMS());
+$wms->doGametime();

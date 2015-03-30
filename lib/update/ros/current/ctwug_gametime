@@ -1,0 +1,63 @@
+:local softid [/system license get software-id]
+:local qos 0
+:local gtdisabled yes
+
+# This gets created after an upgrade to do a one-shot gametime check
+/system scheduler
+:foreach n in [find where name="ctwug_gametime_temp"] do={
+  :log info ("ctwug_gametime: removing scheduler " . [get $n name])
+  remove $n
+}
+
+/queue simple
+:foreach n in [find where name~"^ctwug_"] do={
+  :set qos 1
+  :if (![get $n disabled]) do={
+    :set gtdisabled no
+  }
+}
+
+:if ($qos = 1) do={
+  :local apipath ("api/gametime?softid=".$softid)
+  :if ([/system routerboard get routerboard]) do={
+    :local serial [/system routerboard get serial-number]
+    :set apipath ($apipath."&serial=".$serial)
+  }
+  :if (!$gtdisabled) do={
+    :set apipath ($apipath."&on=1")
+  }
+#  If this returns 404, the script aborts
+  /tool fetch address=wms.ctwug.za.net host=wms.ctwug.za.net src-path=$apipath mode=http keep-result=no
+
+#  Successful fetch means toggle current status
+  :if ($gtdisabled) do={
+    :log info "ctwug_gametime: setting gametime ON"
+    :set gtdisabled no
+  } else={
+    :log info "ctwug_gametime: setting gametime OFF"
+    :set gtdisabled yes
+  }
+
+#   Disable some logging... prevents ALOT of noise from being logged
+  /system logging
+  :foreach log in [find] do={
+    :foreach topic in [get $log topics] do={
+      :if ($topic = "info" || $topic = "system") do={ disable $log }
+    }
+  }
+  /queue simple
+  :foreach n in [find where name~"^ctwug_" && disabled!=$gtdisabled] do={
+    set $n disabled=$gtdisabled
+  }
+  /ip firewall mangle
+  :foreach n in [find where comment~"^AUTO" && disabled!=$gtdisabled] do={
+    set $n disabled=$gtdisabled
+  }
+#   Re-enable logging
+  /system logging
+  :foreach log in [find] do={
+    :foreach topic in [get $log topics] do={
+      :if ($topic = "info" || $topic = "system") do={ enable $log }
+    }
+  }
+}

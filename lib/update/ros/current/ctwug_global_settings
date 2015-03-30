@@ -1,0 +1,284 @@
+:local rosmver [:pick [/system resource get version] 0]
+
+# Make sure 172.18.1.1 is the first DNS server in /ip dns
+:local found 0
+/ip dns
+:foreach server in=[get servers] do={
+  :if ($server = "172.18.1.1") do={ :set found 1 }
+}
+:if ($found = 0) do={
+  :log info "ctwug_global_settings: adding 172.18.1.1 to DNS servers"
+  :local dnsser ("172.18.1.1",[get servers])
+  set servers=$dnsser
+}
+
+# Remove static DNS entries from NOC migration
+/ip dns static
+:foreach n in=[find where address=172.18.1.10] do={
+  :local name [get $n name]
+  :if ($name = "noc.ctwug.za.net") do={ remove $n; }
+  :if ($name = "web.ctwug.za.net") do={ remove $n; }
+}
+
+# Setup the clock
+/system clock
+:if ([get time-zone-name] != "Africa/Johannesburg") do={
+  :log info "ctwug_global_settings: setting time zone to Africa/Johannesburg"
+  set time-zone-name=Africa/Johannesburg
+}
+:set found 1
+/system ntp client
+:if (![get enabled]) do={ :set found 0 }
+:if ([get mode] != "unicast") do={ :set found 0 }
+:if ([get primary-ntp] != 172.18.1.1) do={ :set found 0 }
+:if ($found = 0) do={
+  :log info "ctwug_global_settings: enabling unicast NTP client"
+  set enabled=yes mode=unicast primary-ntp=172.18.1.1
+}
+
+# Make sure SSH is enabled on the default port
+:set found 1
+/ip service
+:if ([get ssh disabled]) do={
+  :set found 0
+}
+:if ([get ssh port] != 22) do={
+  :set found 0
+}
+:if ($found = 0) do={
+  :log info "ctwug_global_settings: enabling SSH on port 22"
+  set ssh port=22 disabled=no
+}
+
+# Essential schedules to keep everything working!
+/system scheduler
+:set found 0
+:foreach n in=[find where name="ctwug_update"] do={
+  :set found 1
+  :local settings ([get $n interval].":".[get $n disabled])
+  :if ($settings != "01:00:00:false") do={
+    :log info "ctwug_global_settings: updating ctwug_update schedule"
+    set $n interval=1h disabled=no
+  }
+}
+:if ($found = 0) do={
+  :log info "ctwug_global_settings: adding ctwug_update to scheduler"
+  add name="ctwug_update" interval=1h on-event="/system script run ctwug_update"
+}
+:set found 0
+:foreach n in=[find where name="ctwug_gametime"] do={
+  :set found 1
+  :local settings ([get $n start-time].":".[get $n interval].":".[get $n disabled])
+  :if ($settings != "00:00:00:00:20:00:false") do={
+    :log info "ctwug_global_settings: updating ctwug_gametime schedule"
+    set $n start-time=0:0:0 interval=1h disabled=no
+  }
+}
+:if ($found = 0) do={
+  :log info "ctwug_global_settings: adding ctwug_gametime to scheduler"
+  add name="ctwug_gametime" start-time=0:0:0 interval=20m on-event="/system script run ctwug_gametime"
+}
+:set found 0
+:foreach n in=[find where name="ctwug_discover"] do={
+  :set found 1
+  :local settings ([get $n interval].":".[get $n disabled])
+  :if ($settings != "06:00:00:false") do={
+    :log info "ctwug_global_settings: updating ctwug_discover schedule"
+    set $n interval=6h disabled=no
+  }
+}
+:if ($found = 0) do={
+  :log info "ctwug_global_settings: adding ctwug_discover to scheduler"
+  add name="ctwug_discover" interval=6h on-event="/system script run ctwug_discover"
+}
+:set found 0
+:foreach n in=[find where name="ctwug_bootlog"] do={
+  :set found 1
+  :local settings ([get $n start-time].":".[get $n disabled])
+  :if ($settings != "startup:false") do={
+    :log info "ctwug_global_settings: updating ctwug_bootlog schedule"
+    set $n start-time=startup disabled=no
+  }
+}
+:if ($found = 0) do={
+  :log info "ctwug_global_settings: adding ctwug_bootlog to scheduler"
+  add name="ctwug_bootlog" start-time=startup on-event="/system script run ctwug_bootlog"
+}
+
+# Misc settings
+/snmp
+:if (![get enabled]) do={
+  :log info "ctwug_global_settings: enabling SNMP"
+  set enabled=yes
+}
+/snmp community
+:set found 0
+:foreach n in=[find where name="ctwug"] do={
+  :set found 1
+  :local settings ([get $n address].":".[get $n write-access].":".[get $n read-access])
+  :if ($settings != "172.18.1.10/32:true:true") do={
+    :log info "ctwug_global_settings: updating snmp community string"
+    set $n address="172.18.1.10/32" write-access=yes read-access=yes
+  }
+}
+:if ($found = 0) do={
+  :log info "ctwug_global_settings: adding snmp community string"
+  add name="ctwug" address="172.18.1.10/32" write-access=yes read-access=yes
+}
+/ip traffic-flow
+:if ([get enabled] = "yes") do={
+  :log info "ctwug_global_settings: disabling netflows"
+  set enabled=no
+}
+
+# Get OSPF router ID
+/routing ospf instance
+:local routerid 0.0.0.0
+:foreach n in=[find where default && state="running"] do={
+  :set routerid [get $n effective-router-id]
+}
+
+# Remote logging
+/system logging action
+:set found 0
+:foreach n in=[find where name="ctwug"] do={
+  :set found 1
+  :local settings
+  :if ($rosmver = "4") do={
+    :set settings ([get $n target].":".[get $n remote].":".[get $n bsd-syslog].":".[get $n syslog-facility].":".[get $n syslog-severity].":".[get $n src-address])
+  } else={
+    :set settings ([get $n target].":".[get $n remote].":".[get $n remote-port].":".[get $n bsd-syslog].":".[get $n syslog-facility].":".[get $n syslog-severity].":".[get $n src-address])
+  }
+  :if ($settings != "remote:172.18.1.7:514:true:daemon:auto:$routerid") do={
+    :log info "ctwug_global_settings: updating logging action"
+    set $n target=remote remote=172.18.1.7 bsd-syslog=yes syslog-facility=daemon syslog-severity=auto src-address=$routerid
+  }
+}
+:if ($found = 0) do={
+  :log info "ctwug_global_settings: adding logging action"
+  add name=ctwug target=remote remote=172.18.1.7 bsd-syslog=yes syslog-facility=daemon syslog-severity=auto src-address=$routerid
+}
+/system logging
+:set found 0
+:foreach n in=[find where action="ctwug"] do={
+  :local lfound 0
+  :local topics [get $n topics]
+  :if ($topics = "system") do={
+    :set found ($found+1)
+    :set lfound 1
+  }
+  :if ($topics = "script") do={
+    :set found ($found+2)
+    :set lfound 1
+  }
+  :if ($lfound = 0) do={
+    :log info "ctwug_global_settings: removing logging topic"
+    remove $n
+  }
+}
+:if ($found = 0) do={
+    :log info "ctwug_global_settings: adding logging topics"
+    add topics="system" action="ctwug"
+    add topics="script" action="ctwug"
+}
+:if ($found = 1) do={
+    :log info "ctwug_global_settings: adding script logging topic"
+    add topics="script" action="ctwug"
+}
+:if ($found = 2) do={
+    :log info "ctwug_global_settings: adding system logging topic"
+    add topics="system" action="ctwug"
+}
+
+# Configure CTWUG radius AAA
+/radius
+:local rserver 172.18.55.25
+:local rsecret "CTwug!!"
+:local rtimeout 1s
+:set found 0
+:foreach n in [find where service="login"] do={
+  :if ($found = 1) do={
+    :log info ("ctwug_global_settings: removing radius server " . [get $n address])
+    remove $n
+  }
+  :if ($found = 0) do={
+    :set found 1
+    :if ([get $n address] != $rserver) do={ :set found 0 }
+    :if ([get $n secret] != $rsecret) do={ :set found 0 }
+    :if ([get $n timeout] != $rtimeout) do={ :set found 0 }
+    :if ([get $n comment] != "CTWUG") do={ :set found 0 }
+    :if ([:len [get $n src-address]] != 0) do={ :set found 0 }
+    :if ([get $n disabled]) do={ :set found 0 }
+  }
+  :if ($found = 0) do={
+    :log info "ctwug_global_settings: updating radius login server"
+    :set found 1
+    set $n comment="CTWUG" address=$rserver secret=$rsecret timeout=$rtimeout src-address=0.0.0.0 disabled=no
+  }
+}
+:if ($found = 0) do={
+  :log info "ctwug_global_settings: adding radius login server"
+  add service=login address=$rserver secret=$rsecret timeout=$rtimeout comment="CTWUG"
+}
+:set found 1
+/user aaa
+:if (![get use-radius]) do={ :set found 0 }
+:if (![get accounting]) do={ :set found 0 }
+:if ($found = 0) do={
+  :log info "ctwug_global_settings: enabling radius AAA"
+  set use-radius=yes accounting=yes
+}
+
+# Add/check ctwug read-only account+group
+:set found 0
+/user group
+:foreach n in [find where name="ctwug"] do={
+  :local poln 0
+  :local policy [get $n policy]
+  :for i from=0 to=([:len $policy]-1) do={
+    :local pflag [:pick $policy $i]
+    :if ($pflag = "local") do={ :set poln ($poln+1) }
+    :if ($pflag = "telnet") do={ :set poln ($poln+2) }
+    :if ($pflag = "ssh") do={ :set poln ($poln+4) }
+    :if ($pflag = "ftp") do={ :set poln ($poln+8) }
+    :if ($pflag = "reboot") do={ :set poln ($poln+16) }
+    :if ($pflag = "read") do={ :set poln ($poln+32) }
+    :if ($pflag = "write") do={ :set poln ($poln+64) }
+    :if ($pflag = "policy") do={ :set poln ($poln+128) }
+    :if ($pflag = "test") do={ :set poln ($poln+256) }
+    :if ($pflag = "winbox") do={ :set poln ($poln+512) }
+    :if ($pflag = "password") do={ :set poln ($poln+1024) }
+    :if ($pflag = "web") do={ :set poln ($poln+2048) }
+    :if ($pflag = "sniff") do={ :set poln ($poln+4096) }
+    :if ($pflag = "sensitive") do={ :set poln ($poln+8192) }
+# only valid for 5.x
+#    :if ($pflag = "api") do={ :set poln ($poln+16384) }
+  }
+  :if ($poln != 2855) do={
+    :log info "ctwug_global_settings: setting policy on ctwug group"
+    set $n policy=local,telnet,ssh,read,test,winbox,web,!ftp,!reboot,!write,!policy,!password,!sensitive
+  }
+  :set found 1
+}
+:if ($found = 0) do={
+  :log info "ctwug_global_settings: adding ctwug group"
+  add name="ctwug" policy=local,telnet,ssh,read,test,winbox,web,!ftp,!reboot,!write,!policy,!password,!sensitive
+}
+:set found 0
+/user
+:foreach n in [find where name="ctwug"] do={
+  :if ([get $n group] != "ctwug") do={
+    :log info "ctwug_global_settings: modifying ctwug user"
+    set $n group="ctwug"
+    set $n password="ctwug"
+  }
+  :if ([get $n disabled]) do={
+    :log info "ctwug_global_settings: modifying ctwug user"
+    set $n disabled=no
+  }
+  :set found 1
+}
+:if ($found = 0) do={
+  :log info "ctwug_global_settings: adding ctwug user"
+  add name="ctwug" group="ctwug" password="ctwug"
+}
