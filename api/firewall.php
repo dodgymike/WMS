@@ -178,6 +178,9 @@ add chain=output action=jump jump-target=predscp-bulk disabled=yes comment="AUTO
 		return true;
 	}
 
+//Don't echo port and passthrough if they are NULL
+	if (isset($row[8])){
+	echo " port=".$row[8];
 	protected function _firewall_dscpnew_ros () {
 		$l4rules = array();
 		$db = $this->_wms->getDb();

@@ -1,0 +1,57 @@
+log syslog { debug, trace, auth, remote, bug, info, warning, error, fatal };
+
+router id <%= @routerid %>;
+
+filter outkernel
+prefix set bastion;
+{
+        bastion = <%= @anycastips %>;
+        if net ~ bastion then {
+                ospf_metric1 = 100;
+                igp_metric = 100;
+                accept;
+        }
+        reject;
+}
+
+filter inkernel
+prefix set wug;
+{
+        wug = [ 172.18.0.0/16+, 172.26.0.0/16+ ];
+        if net ~ wug then {
+                accept;
+        }
+        reject;
+}
+
+protocol static {
+<% routes.each do | val| -%>
+	route <%= val %> drop;
+<% end -%>
+        import filter outkernel;
+}
+protocol kernel {
+        learn;
+        scan time 10;
+        import none;
+        export filter inkernel;
+}
+
+protocol device {
+        scan time 10;
+}
+
+protocol ospf ctwug {
+        import all;
+        export all;
+        area <%= @areaid %> {
+                interface "<%= @interface %>" <%= @interfacerange %> {
+                        hello 10;
+                        retransmit 5;
+                        cost 10;
+                        dead 40;
+                        type <%= @inftype %>;
+                };
+        };
+}
+
